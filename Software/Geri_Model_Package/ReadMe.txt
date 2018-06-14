@@ -2,7 +2,10 @@
 
 This is meant to be a standalone package that contains all of the MATLAB functions, scripts, and data used to generate an aeroelastic state space model of the mAEWing1 vehicle Geri.
 
-Actuator model as TF object: GeriActuators.mat
+Actuator model as TF objects: GeriActuators.mat
+	contains servo actuator: G_surface_actuator
+	contains 25 ms Pade delay model: Delay_25ms [added 6/14/2018]
+	TODO [6/14/2018]: need to add engine model
 Sensor models as TF objects: Geri_SensorModels.mat
 
 Run: GenerateModel_DEMO.m
