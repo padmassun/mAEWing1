@@ -1,5 +1,6 @@
 (B. Danowsky, STI, 5/21/2018)
 
+
 This is meant to be a standalone package that contains all of the MATLAB functions, scripts, and data used to generate an aeroelastic state space model of the mAEWing1 vehicle Geri.
 
 Actuator model as TF objects: GeriActuators.mat
