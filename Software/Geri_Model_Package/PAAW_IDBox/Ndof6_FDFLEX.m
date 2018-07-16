@@ -1,4 +1,4 @@
-function [ndof6] = Ndof6_FDFLEX(AE6,ModeShape,FEM,Vmps,aeroProp,massProp,coeffdata)
+function [ndof6] = Ndof6_FDFLEX(AE6,ModeShape,FEM,Vmps,aeroProp,massProp,coeffdata,InputType)
 %% Develops the 6dof aeroelastic dynamic model for Geri,
 %
 % This is a BPD-modified version of the original from DKS. several
@@ -30,6 +30,10 @@ function [ndof6] = Ndof6_FDFLEX(AE6,ModeShape,FEM,Vmps,aeroProp,massProp,coeffda
 % Now body axes are being used instaed of stability axes
 
 %   Units: Ft, slugs, rad, sec, 
+
+if nargin<8 || isempty(InputType) 
+    InputType = 'SymAsymInp'; %default are symmetric and anti-symetric inputs
+end
 
 m2f=3.28084; % meters to feet.
 %k2sl=0.0685217659;  % kg to slugs
@@ -577,5 +581,26 @@ ndof6.OutputName={'u','alpha','theta','q','h','beta','phi','p','r','qcg','pcg','
 ndof6.OutputUnit={'ft/s','rad','rad','rad/s','ft','rad','rad','rad/s','rad/s','rad/s','rad/s',...
     'ft/s^2','ft/s^2','ft/s^2','ft/s^2','ft/s^2','ft/s^2','ft/s^2','rad','rad','rad','rad','lb',...
     'rad','rad','rad','rad','ft/s','ft/s^2','ft/s^2','ft/s^2'};
-      
+
+%change input type (re-allocate) to direct inputs if indicated
+if strcmp(InputType,'DirectInp')
+           
+    Tinpinv = [1 0 0 0 0  1  0  0  0 0;
+               1 0 0 0 0 -1  0  0  0 0;
+               0 1 0 0 0  0  1  0  0 0;
+               0 1 0 0 0  0 -1  0  0 0;
+               0 0 1 0 0  0  0  1  0 0;
+               0 0 1 0 0  0  0 -1  0 0;
+               0 0 0 1 0  0  0  0  1 0;
+               0 0 0 1 0  0  0  0 -1 0;
+               0 0 0 0 1  0  0  0  0 0;
+               0 0 0 0 0  0  0  0  0 1];
+           
+    Tinp = ss(inv(Tinpinv));
+    Tinp.inputname = {'L1','R1','L2','R2','L3','R3','L4','R4','Thrust','wGust'};
+    Tinp.inputunit = {'rad','rad','rad','rad','rad','rad','rad','rad','lb','ft/s'};
+    ndof6 = ndof6*Tinp;
+    
+end
+
 end
