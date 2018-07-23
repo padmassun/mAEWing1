@@ -30,7 +30,26 @@ function [ICM_G, ICM_P, ICM_D, IDM_G, IDM_P, OCM_G, OCM_P, OCM_D, ODM_G, ODM_P, 
 if CMI(1).Stable
     fprintf('Closed-loop system is stable.\n\n')
 else
-    warning('Closed-loop system is unstable.')
+    fprintf('Closed-loop system is UNSTABLE.\n\n')
+    ICM_G = 0;
+    ICM_P = 0;
+    ICM_D = 0;
+    IDM_G = 0;
+    IDM_P = 0;
+
+    OCM_G = 0;
+    OCM_P = 0;
+    OCM_D = 0;
+    ODM_G = 0;
+    ODM_P = 0;
+
+    MMI_G  = 0;
+    MMI_P  = 0;
+    MMO_G  = 0;
+    MMO_P  = 0;
+    MMIO_G = 0;
+    MMIO_P = 0;
+    return
 end
 
 

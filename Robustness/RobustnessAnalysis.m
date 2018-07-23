@@ -1,24 +1,31 @@
-%% ROBUSTNESS EVALUATION FOR CONTROLLER REDESIGN
-%
-% based on: 
 % #######################################################################
 %   Robust Control Design for Active Flutter Suppression
 % #######################################################################
-%   Julian Theis, Harald Pfifer, Peter Seiler
-%   Department of Aerospace Engineering and Mechanics
-%   University of Minnesota, Minneapolis 
-%   AIAA 2016 SciTech Paper
+%   Julian Theis, Peter Seiler
 % ########################################################################
-% Control Design for Active Flutter Suppression Controller using Hinf mixed
-% sensitivity loopshaping.
 %
 % ### ANALYSIS PART ###
-% last modified 06/06/2018 Julian Theis
-
-
+% last modified 20/07/2018 Julian Theis
+%
+% RUN PART1_DESIGN_ROBUSTFLUTTERSUPPRESSION FIRST
+% uses variables in workspace, requires 
+% GeriFDsysPID2_IO : model with physical inputs/outputs
+% C : controller with physical inputs/outputs
+% Vinf : vector of airspeed
+%
+% The controller needs to have the correct naming of inputs and outputs
+% (matching the GeriFDsysPID2_IO model)
 %% Define Example System / Controller
-load('example_skoll'); %P = Skoll Modell for Demonstration Purposes
-C = hinfsyn(augw(P(:,:,4),blkdiag(makeweight(1e5,1,0.5),1,1,1),5*eye(2)*makeweight(0.5,10,1e3))); %this is merely an example controller
+load example_geri %loads the required files to run this script as an example
+
+%P = GeriFDsysPID2_IO(Kphys.InputName,Kphys.OutputName);
+% XXX remove low frequency dynamics. Otherwise stability check fails due to
+% open integrators ... this needs some discussion in the group!
+RemoveStates = getStatesIndex(GeriFDsysPID2_IO.StateName,{'h','u','theta','beta','phi'});
+P = ss([]);
+for ii = 1:size(GeriFDsysPID2_IO,3)
+P(:,:,ii) = modred(GeriFDsysPID2_IO(C.InputName,C.OutputName,ii),RemoveStates,'truncate');
+end
 
 w = {0.01, 1000}; %relevant frequency range for plotting
     
@@ -46,7 +53,7 @@ w = {0.01, 1000}; %relevant frequency range for plotting
 %  ** (symmetric) disk margins
 
 
-for ii=1:6
+for ii=1:numel(Vinf)
     fprintf('Model at airspeed %2.0f m/s\n', Vinf(ii))
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
@@ -54,10 +61,26 @@ for ii=1:6
  DisplayLoopmargin(P(:,:,ii),C);
 end
 
-%example plot of minimum classical phase margin at input over airspeed
-figure; plot(Vinf,OCM_P); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
-%example plot of symmetric disk margin at input over airspeed
-figure; plot(Vinf,mag2db(IDM_G)); title('Input Disk Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:))
+%calculate Robust and Absolute Flutter Speed
+
+[RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P,OCM_P,ICM_G,OCM_G,Vinf);
+fprintf('Robust Flutter Speed: %d \nAbsolute Flutter Speed: %d \n',RFS,AFS)
+
+% plot of minimum classical phase margin at input over airspeed
+figure; plot(Vinf,ICM_P); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
+hold on; plot(vis.RFS_P_x, vis.RFS_P_y, 'b-', 'LineWidth', 3); hold off;
+
+% plot of minimum classical gain margin at input over airspeed
+figure; plot(Vinf,abs(db(ICM_G))); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
+hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
+
+% plot of minimum classical phase margin at output over airspeed
+figure; plot(Vinf,OCM_P); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
+hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
+
+% plot of minimum classical gain margin at output over airspeed
+figure; plot(Vinf,abs(db(OCM_G))); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
+hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
 
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
@@ -75,13 +98,15 @@ figure; plot(Vinf,mag2db(IDM_G)); title('Input Disk Gain Margin'); xlabel('airsp
 % * structured uncertainty descriptions
 % ** combinations of dynamic actuator, plant, and sensor uncertainty
 
-DisplayLoopsens(P(:,:,4),C,w,'g'); %plot gang of six Singular Values
+% check at robust flutter speed
+DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'g'); %plot gang of six Singular Values
 
-DisplayLoopsens(P(:,:,4),C,w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
-DisplayLoopsens(P(:,:,4),C,w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
-DisplayLoopsens(P(:,:,4),C,w,'ua'); %plot allowable dynamic additive uncertainty
-DisplayLoopsens(P(:,:,4),C,w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
-[~, Peaks] = DisplayLoopsens(P(:,:,4),C,w,'so') %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
+DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'ua'); %plot allowable dynamic additive uncertainty
+DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
+[~, Peaks] = DisplayLoopsens(P(:,:,Vinf==RFS),C,w,'so') %plot allowable dynamic multiplicative uncertainty in each input
+
 
 
 %% QUALITATIVE (Root Loci)
@@ -90,6 +115,14 @@ DisplayLoopsens(P(:,:,4),C,w,'si'); %plot allowable dynamic multiplicative uncer
 % * flutter speed predicted by root-loci (also under uncertainty)
 
 varypzmap(P)
+xlim([-60,10])
+ylim([-5,60])
+sgrid
+
+varypzmap(feedback(P,C))
+xlim([-60,10])
+ylim([-5,60])
+sgrid
 %% FURTHER ANALYSIS 
 % Mu Analysis with real parameters (I can set up an uncertain model, 
 % but we should first agree on the parameters. Plus I think, I require some more time)
