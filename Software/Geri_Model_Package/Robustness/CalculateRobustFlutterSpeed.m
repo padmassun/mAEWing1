@@ -15,22 +15,22 @@ function [RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P, OCM_P, ICM_G, OCM_
 % over airspeed plot
 
 [~,Vidx] = find(ICM_P<=45);
-RFS_ICM_P = Vinf(min(Vidx));
+RFS_ICM_P = Vinf(min(Vidx)-1);
 [~,Vidx] = find(ICM_P==0);
 AFS_ICM_P = Vinf(min(Vidx));
 
 [~,Vidx] = find(OCM_P<=45);
-RFS_OCM_P = Vinf(min(Vidx));
+RFS_OCM_P = Vinf(min(Vidx)-1);
 [~,Vidx] = find(OCM_P==0);
 AFS_OCM_P = Vinf(min(Vidx));
 
 [~,Vidx] = find(abs(db(ICM_G))<=6);
-RFS_ICM_G = Vinf(min(Vidx));
+RFS_ICM_G = Vinf(min(Vidx)-1);
 [~,Vidx] = find(abs(ICM_G)==0);
 AFS_ICM_G = Vinf(min(Vidx));
 
 [~,Vidx] = find(abs(db(OCM_G))<=6);
-RFS_OCM_G = Vinf(min(Vidx));
+RFS_OCM_G = Vinf(min(Vidx)-1);
 [~,Vidx] = find(abs(OCM_G)==0);
 AFS_OCM_G = Vinf(min(Vidx));
 
