@@ -75,11 +75,11 @@ figure; plot(Vinf,abs(db(ICM_G))); title('Minimum Input Gain Margin'); xlabel('a
 hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
 
 % plot of minimum classical phase margin at output over airspeed
-figure; plot(Vinf,OCM_P); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
+figure; plot(Vinf,OCM_P); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
 hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
 
 % plot of minimum classical gain margin at output over airspeed
-figure; plot(Vinf,abs(db(OCM_G))); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
+figure; plot(Vinf,abs(db(OCM_G))); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
 hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
 
 %% Closed-Loop Transfer Function Analysis
