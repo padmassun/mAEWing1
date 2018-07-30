@@ -1,4 +1,4 @@
-function sys_full = NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,massProp,coeffdata,actdata,sensdata)
+function [sys_full,sys_bare_use,ACT2use,SENS2use,sys_bare] = NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,massProp,coeffdata,actdata,sensdata)
 
 %generate state space system with selected I/O that includes actuator and sensor dynamics
 %INPUTS:
@@ -11,7 +11,10 @@ function sys_full = NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,ma
 %OUTPUTS;
 %sys_full = resulting state space system with inputs, outputs, and states labeled (including units). 
 %           this system inludes actuator and sensor dynamics
-%*this system has direct individual surface inputs, not sym and asym input pairs
+%           *this system has direct individual surface inputs, not sym and asym input pairs
+%sys_bare_use = bare airframe system
+%ACT2use = actuator system
+%SENS2use = sensor system
 %
 %Brian Danowsky, Systems Technology, Inc. 2018
 
@@ -26,6 +29,8 @@ ACT = blkdiag(G_surface_actuator,G_surface_actuator,G_surface_actuator,G_surface
     G_surface_actuator,G_surface_actuator,G_surface_actuator,G_surface_actuator,engine_lag,1);
 ACT.inputname = sys_bare.inputname;
 ACT.inputunit = sys_bare.inputunit;
+ACT.outputname = ACT.inputname;
+ACT.outputunit = ACT.inputunit;
 
 %define full sensor system------------
 G_sens_IMU = sensdata.G_sens_IMU;
@@ -38,6 +43,8 @@ SENS = blkdiag(G_sens_IMU,G_sens_IMU,G_sens_IMU,G_sens_IMU,G_sens_IMU,G_sens_IMU
     G_sens_Accel,G_sens_Accel);
 SENS.outputname = sys_bare.outputname;
 SENS.outputunit = sys_bare.outputunit;
+SENS.inputname = SENS.outputname;
+SENS.inputunit = SENS.inputunit;
 
 %reduced actuator and sensor systems based on selected I/O----------
 ACT2use = ss(ACT(ikeep,ikeep)); %if ACT is a tf, appropriate states will be truncated with the selected inputs
@@ -50,7 +57,7 @@ for ind = 1:size(SENS2use.a,1)
     SENS2use.statename{ind} = ['sensor(' num2str(ind) ')'];
 end
 
+sys_bare_use = sys_bare(okeep,ikeep);
+
 %build complete system----------
-sys_full = SENS2use*sys_bare(okeep,ikeep)*ACT2use;
-
-
+sys_full = SENS2use*sys_bare_use*ACT2use;
