@@ -67,20 +67,24 @@ end
 fprintf('Robust Flutter Speed: %d \nAbsolute Flutter Speed: %d \n',RFS,AFS)
 
 % plot of minimum classical phase margin at input over airspeed
-figure; plot(Vinf,ICM_P); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
-hold on; plot(vis.RFS_P_x, vis.RFS_P_y, 'b-', 'LineWidth', 3); hold off;
+figure; plot(Vinf,ICM_P,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
+xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
+hold on; area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 
 % plot of minimum classical gain margin at input over airspeed
-figure; plot(Vinf,abs(db(ICM_G))); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
-hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
+figure; semilogy(Vinf,abs(db(ICM_G)),'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
+xlim([Vinf(1) Vinf(end)]);
+hold on; area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 
 % plot of minimum classical phase margin at output over airspeed
-figure; plot(Vinf,OCM_P); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:))
-hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
+figure; plot(Vinf,OCM_P,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
+xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
+hold on; area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 
 % plot of minimum classical gain margin at output over airspeed
-figure; plot(Vinf,abs(db(OCM_G))); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:))
-hold on; plot(vis.RFS_G_x, vis.RFS_G_y, 'b-', 'LineWidth', 3); hold off;
+figure; semilogy(Vinf,abs(db(OCM_G)),'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:),'Location','southwest')
+xlim([Vinf(1) Vinf(end)]);
+hold on; area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
