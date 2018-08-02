@@ -1,0 +1,112 @@
+Enter PWM output number for calibration:
+PWM output = 22
+Begining Test
+Hold Surface at Zero Position
+Zero position: -11.21
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [-29.48  -22.53  -15.67  -7.97  -1.92  -0.29  1.13  7.24  14.79  22.50  30.71  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 21
+Begining Test
+Hold Surface at Zero Position
+Zero position: -10.37
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [-28.95  -22.24  -15.27  -7.81  -1.89  -0.37  1.21  7.11  14.85  22.77  30.74  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 4
+Begining Test
+Hold Surface at Zero Position
+Zero position: -11.25
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [-23.93  -19.02  -13.34  -6.64  -1.19  0.03  1.21  7.14  14.57  22.29  30.24  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 23
+Begining Test
+Hold Surface at Zero Position
+Zero position: -9.01
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [-25.00  -19.45  -13.67  -6.82  -1.53  -0.44  0.52  6.91  14.79  23.02  30.34  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 3
+Begining Test
+Hold Surface at Zero Position
+Zero position: -7.01
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [28.20  20.71  13.43  6.44  1.58  0.12  -1.03  -5.89  -11.22  -16.06  -20.28  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 5
+Begining Test
+Hold Surface at Zero Position
+Zero position: -11.84
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [31.67  23.36  15.52  7.74  1.66  0.20  -1.04  -6.72  -13.47  -19.89  -25.94  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 6
+Begining Test
+Hold Surface at Zero Position
+Zero position: -11.90
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [31.10  22.67  14.47  6.52  0.40  -1.03  -2.42  -8.28  -15.19  -21.80  -27.80  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);
+Enter PWM output number for calibration:
+PWM output = 10
+Begining Test
+Hold Surface at Zero Position
+Zero position: -11.80
+Switch to Auto Mode
+Hands Clear!
+Calibration Starting
+Calibration Complete
+
+pwm_us = [1120.00  1220.00  1320.00  1420.00  1500.00  1520.00  1540.00  1620.00  1720.00  1820.00  1920.00  ];
+angle_deg = [32.41  24.00  16.01  7.90  1.68  0.21  -1.16  -7.26  -14.36  -21.15  -27.34  ];
+fitOrder = 2; % Start with quadratic, alter as required
+[polyCoef, pwmZero_us] = SurfCal(pwm_us, angle_deg, fitOrder);

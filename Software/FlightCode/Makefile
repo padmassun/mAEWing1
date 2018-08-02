@@ -38,8 +38,10 @@ MISSION = mission/tres_claw_switch.c
 # Point to the desired flight control law code here
 #CONTROL =  control/control_surfaceCalCheck.c
 #CONTROL =  control/tres_claw_geri.c
-#CONTROL =  control/tres_claw_geri_FLT13.c
-CONTROL =  control/tres_claw_geri_FLT14.c
+CONTROL =  control/tres_claw_geri_FLT16.c
+#CONTROL =  control/tres_claw_geri_FLT17.c
+
+
 CONTROLFS01 =  control/ss_flutter_suppression01.c
 CONTROLFS02 =  control/ss_flutter_suppression02.c
 CONTROLFS03 =  control/ss_flutter_suppression03.c
@@ -61,8 +63,8 @@ $(RTW_ROOT)rt_nonfinite.c
 # Point to the desired system ID code here
 #SYSTEM_ID = system_id/systemid_none.c
 #SYSTEM_ID = system_id/sysid_geri.c
-#SYSTEM_ID = system_id/sysid_geri_FLT13.c
-SYSTEM_ID = system_id/sysid_geri_FLT14.c
+SYSTEM_ID = system_id/sysid_geri_FLT16.c
+#SYSTEM_ID = system_id/sysid_geri_FLT17.c
 
 #### Determine which aircraft config file, data logging, actuator, and sensor files to compile
 ifeq ($(strip $(AIRCRAFT)),HIL_SIM)

@@ -114,12 +114,12 @@ void three_multi_sine (double t,	///< [sec], current time
 		double*dr					///< pointer to rudder control surface
 		);
 /// Auxiliary function that adds a pre-defined OMS signal
-double playback_OMS1_1(int i, 	        ///< [sec], current time
+double playback_OMS1_1_8(int i, 	        ///< [sec], current time
 		double amp);			    ///< [rad], amplitude of sine signal
 		
-/// Auxiliary function that adds a pre-defined OMS signal
-double playback_OMS2_1(int i, double amp);
-double playback_OMS2_2(int i, double amp);
+double playback_OMS1_1_12(int i, 	        ///< [sec], current time
+		double amp);			    ///< [rad], amplitude of sine signal
+		
 
 /// Auxiliary function that adds a pre-defined OMS signal
 //double playback_OMS4_1(int i, double amp);

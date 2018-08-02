@@ -3,6 +3,7 @@
 
 #include "../globaldefs.h"
 #include "control_interface.h"
+
 #include "../system_id/systemid_interface.h"
 
 // ***********************************************************************************
@@ -13,8 +14,8 @@
 static double pilot_theta(struct sensordata *sensorData_ptr);
 static double pilot_phi(struct sensordata *sensorData_ptr);
 
-static double roll_control (double phi_ref, double roll_angle, double rollrate, double delta_t, unsigned short gain_selector);
-static double pitch_control(double the_ref, double pitch, double pitchrate, double delta_t, unsigned short gain_selector);
+static double roll_control (double phi_ref, double phi_meas, double rollrate, double delta_t, unsigned short gain_selector);
+static double pitch_control(double the_ref, double the_meas, double pitchrate, double delta_t, unsigned short gain_selector);
 static double speed_control(double speed_ref, double airspeed, double delta_t);
 static double alt_control(double alt_ref, double alt, double delta_t);
 
@@ -36,6 +37,8 @@ static double e[4] = {0,0,0};
 static double integrator[4] = {0,0,0,0};
 static short anti_windup[4]={1,1,1,1};   // integrates when anti_windup is 1
 
+/// ****************************************************************************************
+
 /// Gains
 #ifdef AIRCRAFT_SKOLL
 	static double roll_gain[3]  		= {0.5,0.15,0.01};  	// PI gains for roll tracker and roll damper
@@ -55,11 +58,11 @@ static short anti_windup[4]={1,1,1,1};   // integrates when anti_windup is 1
 
 #ifdef AIRCRAFT_GERI
 	static double roll_gain[3]  		= {0.5,0.15,0.01};  	// PI gains for roll tracker and roll damper
-	static double roll_gain_single[3]  	= {1.5,0.5,0.0};  		// PI gains for roll tracker and roll damper when using only Flap2
-	static double pitch_gain[3] 		= {-0.3,-0.40,0.0};  	// PI gains for pitch tracker and pitch damper
-	static double pitch_gain_single[3] 	= {-0.75,-1.0,0.0};  	// PI gains for pitch tracker and pitch damper when using only Flap3
-	static double v_gain[2]     		= {0.1, 0.020};			// PI gains for speed tracker
-	static double alt_gain[2]     		= {0.1*D2R, 0.0*D2R};	// PI gains for speed tracker
+	static double roll_gain_single[3]  	= {0.5,0.15,0.01};  	// PI gains for roll tracker and roll damper when using only Flap2
+	static double pitch_gain[3] 		= {-0.3,-0.15,0.0};  	// PI gains for pitch tracker and pitch damper
+	static double pitch_gain_single[3] 	= {-0.3,-0.15,0.0};  	// PI gains for pitch tracker and pitch damper when using only Flap3
+	static double v_gain[2]     		= {0.0278, 0.0061};		// PI gains for speed tracker
+	static double alt_gain[2]     		= {0.0543*D2R, 0.0*D2R};// PI gains for speed tracker
 #endif
 
 double base_pitch_cmd		= 0.0;  				// Trim value 4 deg
@@ -123,7 +126,7 @@ static double pilot_theta(struct sensordata *sensorData_ptr){
 	double pitch_incp = sensorData_ptr->inceptorData_ptr->pitch;
 	double theta_cmd;
 	
-	theta_cmd = 20*D2R*pitch_incp;
+	theta_cmd = 30*D2R*pitch_incp;
 	return theta_cmd;
 }
 
@@ -180,12 +183,12 @@ void pilot_flying(double time, double ias_cmd, struct sensordata *sensorData_ptr
 }
 
 // Roll get_control law: angles in radians. Rates in rad/s. Time in seconds
-static double roll_control (double phi_ref, double roll_angle, double rollrate, double delta_t, unsigned short gain_selector)
+static double roll_control (double phi_ref, double phi_meas, double rollrate, double delta_t, unsigned short gain_selector)
 {
 	double da;
 
 	// roll attitude tracker
-	e[0] = phi_ref - roll_angle;
+	e[0] = phi_ref - phi_meas;
 	integrator[0] += e[0]*delta_t*anti_windup[0]; //roll error integral (rad)
 
 	//proportional term + integral term              - roll damper term
@@ -206,12 +209,12 @@ static double roll_control (double phi_ref, double roll_angle, double rollrate, 
 }
 
 // Pitch get_control law: angles in radians. Rates in rad/s. Time in seconds
-static double pitch_control(double the_ref, double pitch, double pitchrate, double delta_t, unsigned short gain_selector)
+static double pitch_control(double the_ref, double the_meas, double pitchrate, double delta_t, unsigned short gain_selector)
 {
 	double de;
 	
 	// pitch attitude tracker
-	e[1] = the_ref - pitch;
+	e[1] = the_ref - the_meas;
 	integrator[1] += e[1]*delta_t*anti_windup[1]; //pitch error integral
 
     // proportional term + integral term               - pitch damper term
@@ -255,25 +258,26 @@ static double speed_control(double speed_ref, double airspeed, double delta_t)
 
 
 void reset_roll(){
+	e[0] = 0;
 	integrator[0] = 0;
 	anti_windup[0] = 1;
-	e[0] = 0;
 }
 void reset_pitch(){
+	e[1] = 0;
 	integrator[1] = 0;
 	anti_windup[1] = 1;
-	e[1] = 0;
 }
 void reset_speed(){
+	e[2] = 0;
 	integrator[2] = 0;
 	anti_windup[2] = 1;
-	e[2] = 0;
 }
 void reset_alt(){
+	e[3] = 0;
 	integrator[3] = 0;
 	anti_windup[3] = 1;
-	e[3] = 0;
 }
+
 void reset_tracker(){
 	reset_roll();
 	reset_pitch();

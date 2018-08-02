@@ -76,8 +76,8 @@ double approach_speed 		= 16;					// Approach airspeed, m/s, 20
 double flare_theta 			= 1.5*D2R;				// Absolute angle for the flare
 double flare_speed 			= 12;					// Flare airspeed, m/s, 17
 double pilot_flare_delta	= 2;					// Delta flare airspeed if the pilot is landing, m/s
-double trim_speed[3]		= {23, 23, 23};			// Trim airspeed, m/s, 20
-double exp_speed[3]     	= {25, 25, 27};	       	// Speed to run the experiments at, m/s
+double trim_speed[3]		= {23, 23, 20};			// Trim airspeed, m/s, 20
+double exp_speed[3]     	= {29, 29, 20};	       	// Speed to run the experiments at, m/s
 double alt_cmd;
 double alt_min              = 30;                   // Minimum altitude hold engage height, m
 double alt_max              = 150;                  // Maximum altitude hold engage height, m
@@ -122,8 +122,9 @@ extern void get_control(double time, struct sensordata *sensorData_ptr, struct n
 	static double t0 = 0;
 	double claw_time; // time since claw mode started
 	static int altCmd_latched = FALSE;	// altitude latching
-	static int flutsup_latched = FALSE;	// flutter suppression latching
+	static int flutsup_sel = 0;			// flutter suppression mode select, acts as latch for current mode
 	static int flutsup_init = FALSE;	// flutter suppression initial
+	
 
 	switch(claw_mode){
 		case 0: // experiment mode
@@ -133,32 +134,37 @@ extern void get_control(double time, struct sensordata *sensorData_ptr, struct n
 					missionData_ptr -> run_excitation = 1;
 					missionData_ptr -> sysid_select = 0;
 					if(altCmd_latched == FALSE){alt_cmd = sensorData_ptr->adData_ptr->h_filt; reset_alt(); altCmd_latched = TRUE;} // Catch first pass to latch current altitude
-					if(flutsup_latched == FALSE){flutsup_init = TRUE; reset_flutsup(); flutsup_latched = TRUE;} // Catch first pass to latch current sensor values
-					alt_hold_inner(time, exp_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, controlData_ptr);
-					if(flutsup_init==TRUE){flutsup_init=FALSE;}
+					if(flutsup_sel != 1){flutsup_init = TRUE; reset_flutsup(); flutsup_sel = 1;} // Catch first pass to latch current sensor values
+					
+					alt_hold_flutsupMidaas(time, exp_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
+					
+					if(flutsup_init == TRUE){flutsup_init = FALSE;}
 					break;
 				case 1: // SYSID #2
 					missionData_ptr -> run_excitation = 1;
 					missionData_ptr -> sysid_select = 1;
 					if(altCmd_latched == FALSE){alt_cmd = sensorData_ptr->adData_ptr->h_filt; reset_alt(); altCmd_latched = TRUE;} // Catch first pass to latch current altitude
-					if(flutsup_latched == FALSE){flutsup_init = TRUE; reset_flutsup(); flutsup_latched = TRUE;} // Catch first pass to latch current sensor values
-					alt_hold_flutsupHinf(time, exp_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
-					if(flutsup_init==TRUE){flutsup_init=FALSE;}
+					if(flutsup_sel != 2){flutsup_init = TRUE; reset_flutsup(); flutsup_sel = 2;} // Catch first pass to latch current sensor values
+					
+					alt_hold_flutsupClas(time, exp_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
+					
+					if(flutsup_init == TRUE){flutsup_init = FALSE;}
 					break;
 				default: // SYSID #3
-					missionData_ptr -> run_excitation = 1;
+					missionData_ptr -> run_excitation = 0;
 					missionData_ptr -> sysid_select = 2;
-					if(altCmd_latched == FALSE){alt_cmd = sensorData_ptr->adData_ptr->h_filt; reset_alt(); altCmd_latched = TRUE;} // Catch first pass to latch current altitude
-					if(flutsup_latched == FALSE){flutsup_init = TRUE; reset_flutsup(); flutsup_latched = TRUE;} // Catch first pass to latch current sensor values
-					alt_hold_flutsupHinf(time, exp_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
-					if(flutsup_init==TRUE){flutsup_init=FALSE;}
+					altCmd_latched = FALSE;
+					flutsup_sel = 0;
+					
+					pilot_flying_inner(time, exp_speed[claw_select], sensorData_ptr, navData_ptr, controlData_ptr);
+					
 					break;
 			}
 			break;
 		case 2: // autolanding mode
 			missionData_ptr -> run_excitation = 0;
 			altCmd_latched = FALSE;
-			flutsup_latched = FALSE; flutsup_init = FALSE;
+			flutsup_sel = 0; flutsup_init = FALSE; flutsup_sel = 0;
 			switch(claw_select){
 				case 0: // approach
 					t0_latched = FALSE;
@@ -174,7 +180,7 @@ extern void get_control(double time, struct sensordata *sensorData_ptr, struct n
 					break;
 				default: // pilot guidance
 					t0_latched = FALSE;
-					pilot_flying(time, (flare_speed + pilot_flare_delta), sensorData_ptr, navData_ptr, controlData_ptr);
+					pilot_flying_inner(time, (flare_speed + pilot_flare_delta), sensorData_ptr, navData_ptr, controlData_ptr);
 					break;
 			}
 			break;
@@ -182,16 +188,18 @@ extern void get_control(double time, struct sensordata *sensorData_ptr, struct n
 			missionData_ptr -> run_excitation = 0;
 			altCmd_latched = FALSE;
 			t0_latched = FALSE;
-			switch(claw_select){
-				case 0: // Normal
-					flutsup_latched = FALSE; flutsup_init = FALSE;
-				
+			switch(flutsup_sel){ // Mode is based on state of flutsup_sel
+				default: // Normal, flutter suppression mode has not been latched
 					pilot_flying_inner(time, trim_speed[claw_select], sensorData_ptr, navData_ptr, controlData_ptr);
+					
 					break;
-				default: // Flutter Suppression
-					if(flutsup_latched == FALSE){flutsup_init = TRUE; reset_flutsup(); flutsup_latched = TRUE;} // Catch first pass to latch current sensor values
-					alt_hold_flutsupHinf(time, trim_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
-					if(flutsup_init==TRUE){flutsup_init=FALSE;}
+				case 1: // Flutter suppression mode 1
+					alt_hold_flutsupMidaas(time, trim_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
+					
+					break;
+				case 2: // Flutter suppression mode 2
+					alt_hold_flutsupClas(time, trim_speed[claw_select], alt_cmd, sensorData_ptr, navData_ptr, flutsup_init, controlData_ptr);
+					
 					break;
 			}
 			break;
@@ -548,6 +556,7 @@ void flare_control(double time, struct sensordata *sensorData_ptr, struct nav *n
 	double ramp_time = 3.5;
 	double min_speed = 8;
 	double cut_time  = 3;
+	double phiLim  = 10 * D2R;
 	double phi   = navData_ptr->phi;						// roll angle
 	double theta = navData_ptr->the - base_pitch_cmd; 		// subtract theta trim value to convert to delta coordinates
 	double p     = sensorData_ptr->imuData_ptr->p; 			// roll rate
@@ -581,7 +590,15 @@ void flare_control(double time, struct sensordata *sensorData_ptr, struct nav *n
 				
 	controlData_ptr->theta_cmd 	= theta_cmd - base_pitch_cmd;	// delta theta command [rad]
 	controlData_ptr->ias_cmd 	= ias_cmd;						// absolute airspeed command [m/s]
-	controlData_ptr->phi_cmd	= 0;							// wings level
+	controlData_ptr->phi_cmd	= pilot_phi(sensorData_ptr);	// phi from the pilot stick;							// wings level
+	
+	// Reduce the allowable phi commands to +/- phiLim
+	if (controlData_ptr->phi_cmd > phiLim){
+		controlData_ptr->phi_cmd = phiLim;
+	}
+	else if(controlData_ptr->phi_cmd < -phiLim){
+		controlData_ptr->phi_cmd = -phiLim;
+	}
 	
 	theta_cmd 	= controlData_ptr->theta_cmd;
 	ias_cmd		= controlData_ptr->ias_cmd;
