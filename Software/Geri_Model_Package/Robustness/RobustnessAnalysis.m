@@ -16,12 +16,13 @@
 % The controller needs to have the correct naming of inputs and outputs
 % (matching the GeriFDsysPID2_IO model)
 %% Define Example System / Controller
-load example_geri %loads the required files to run this script as an example
+ load example_geri %loads the required files to run this script as an example
 
-%P = GeriFDsysPID2_IO(Kphys.InputName,Kphys.OutputName);
+%%
+
 % XXX remove low frequency dynamics. Otherwise stability check fails due to
 % open integrators ... this needs some discussion in the group!
-RemoveStates = getStatesIndex(GeriFDsysPID2_IO.StateName,{'h','u','theta','beta','phi'});
+RemoveStates = getStatesIndex(GeriFDsysPID2_IO.StateName,{'h','u','theta','phi'});
 P = ss([]);
 for ii = 1:size(GeriFDsysPID2_IO,3)
 P(:,:,ii) = modred(GeriFDsysPID2_IO(C.InputName,C.OutputName,ii),RemoveStates,'truncate');
@@ -54,7 +55,7 @@ w = {0.01, 1000}; %relevant frequency range for plotting
 
 
 for ii=1:numel(Vinf)
-    fprintf('Model at airspeed %2.0f m/s\n', Vinf(ii))
+    fprintf('\nModel at airspeed %2.0f m/s:\n', Vinf(ii))
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
  MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
@@ -67,24 +68,32 @@ end
 fprintf('Robust Flutter Speed: %d \nAbsolute Flutter Speed: %d \n',RFS,AFS)
 
 % plot of minimum classical phase margin at input over airspeed
-figure; plot(Vinf,ICM_P,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
+InputPhase = ICM_P; InputPhase(InputPhase>=90)=90; InputPhase(InputPhase==0)=-Inf;
+figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
-hold on; area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
+area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 
 % plot of minimum classical gain margin at input over airspeed
-figure; semilogy(Vinf,abs(db(ICM_G)),'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
-xlim([Vinf(1) Vinf(end)]);
-hold on; area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+InputGain = abs(db(ICM_G));
+figure; semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
+xlim([Vinf(1) Vinf(end)]); ylim([0 40]);
+hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
+area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 
 % plot of minimum classical phase margin at output over airspeed
-figure; plot(Vinf,OCM_P,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
+OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90; OutputPhase(OutputPhase==0)=-Inf;
+figure; plot(Vinf,OutputPhase,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
-hold on; area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
+area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 
 % plot of minimum classical gain margin at output over airspeed
-figure; semilogy(Vinf,abs(db(OCM_G)),'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:),'Location','southwest')
+OutputGain = abs(db(OCM_G));
+figure; semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]);
-hold on; area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
+area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
