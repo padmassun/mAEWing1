@@ -1,4 +1,4 @@
-function [sysmod, T, Tinv] = modalform(sys)
+function [sysmod, Tmod, Tinv, frq] = modalform(sys)
 % perform "canon" transformation to modal form and sort modes with
 % ascending frequency
 

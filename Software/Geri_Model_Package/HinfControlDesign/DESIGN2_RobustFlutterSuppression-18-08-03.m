@@ -172,14 +172,28 @@ bodemag(K,{0.1,300},bopt);grid;
 if exist('garyfyFigure','file');garyfyFigure;end;
 
 % Plot the modal sensitivites open-loop vs closed-loop
-figure(6);bodemag(Gweighted(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),FGK(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),{10,300})
+figure(6);bodemag(Weta\Gweighted(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),Weta\FGK(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),{10,300})
 
 
+%% Controller Reduction
+damp(K)
+[Kmod, ~, ~, frq] = modalform(K);
 
+figure(97); bodemag(K,modred(Kmod,frq>150,'residualize'),{0.1,300})
+Kmod = modred(Kmod,frq>150,'residualize');
+
+% hankelsv(Kmod)
+Kphys = modred(balreal(Kmod),16:size(Kmod.a,1),'residualize')
+figure(98); sigma(K, Kmod, Kphys,{0.1,300})
+
+figure(100); bodemag(K(4,8),Kphys(4,8),{0.1,300},bopt)
 
           
 %% Comparing the pole locations of the closed-loop with and without flutter
 % suppression 
+
+
+
 
 varypzmap(sys_openloop,'gray')
 hold on; pzmap(sys_openloop(:,:,VV==designspeed),'r'); hold off;
@@ -188,19 +202,14 @@ ylim([-5,60])
 sgrid
 
 
-varypzmap(feedback(sys_openloop,K),'gray')
-hold on; pzmap(feedback(sys_openloop(:,:,VV==designspeed),K),'r'); hold off;
+varypzmap(feedback(sys_openloop,Kphys),'gray')
+hold on; pzmap(feedback(sys_openloop(:,:,VV==designspeed),Kphys),'r'); hold off;
 xlim([-60,10])
 ylim([-5,60])
 sgrid
 
 
-% bodemag(K, modred(modalform(K),28:51) ) %31
 
-Kphys = modred(balreal(modred(modalform(K),28:51)),15:27,'residualize'); %14 führt zu 41/43 11 führt zu 40/42
-figure(99); bodemag(K, Kphys,{0.1,300},bopt)
-
-figure(99); bodemag(K(1,1),Kphys(1,1))
 %% Define System / Controller
 
 %P = GeriFDsysPID2_IO(Kphys.InputName,Kphys.OutputName);
