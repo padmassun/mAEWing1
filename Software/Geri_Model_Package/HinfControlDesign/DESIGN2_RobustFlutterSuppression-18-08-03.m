@@ -110,8 +110,6 @@ else
 end
 figure(2); hold on; bodemag(DesignModel,w,bopt); hold off
 
-% could also do a lower order equivalent model here
-
 %% H-Infinity Controller Design
 
 % select airspeed for design model
@@ -131,15 +129,34 @@ Du = blkdiag(3/180*pi,3/180*pi,3/180*pi,1.6/180*pi);  %2degs
 Wu = blkdiag(eye(2)*bandweight(10,70),eye(2)*bandweight(10,70));  %10/70 10/30
 
 % Select weights for modal velocities
-Weta = 1*blkdiag(1/20,1/20);
+Weta = 1*blkdiag(1/20,1/20);   %*100 *100
 
 % Select disturbance weight
 Dd = Du; %Du; %this could be a dedicated Dd different from Du
 
-syn_mod = modalform( DesignModel(:,:,VV==designspeed) );
+[syn_mod,~,~,~,st] = modalform( DesignModel(:,:,VV==designspeed) );
+
+%provide block structure
+st = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,[18 19],[20 21],[22, 23],[24 25],[26 27],[28 29],[30 31],[32 33],[34 35],[36 37],[38 39],[40 41],[42 43]};
+
+% Transform modes to canonical form
+        Tctr = [];
+        for ii = 1:numel(st)
+            AA = syn_mod.a(st{ii},st{ii});
+            BB = syn_mod.b(st{ii},:);
+            Tctr = blkdiag(Tctr,ssctr(AA,BB));
+        end
+
+syn_modctr = ss2ss(syn_mod,Tctr)
+syn_modctr.a
+
+
+
+
 
 % add modal velocities of structural modes as performance outputs
-syn = add_state_output(syn_mod, [18 20]);
+% syn = add_state_output(syn_mod, [18 20]);
+syn = add_state_output(syn_modctr, [19 21]);
 [nmeas, ncont] = size(DesignModel);
 nperf = size(syn,1)-nmeas;
 
@@ -149,7 +166,7 @@ Gweighted = genplant(syn,De^-1,Wu/Du,Dd,De,[],Weta);
 
 % show weighted modal sensitivities (scale such that peak slightly above
 % 0db. larger to emphasize. 
-figure(4); bodemag(Gweighted(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),{10,300})
+figure(4); bodemag(Gweighted(nmeas+ncont+1:nmeas+ncont+nperf,1:ncont),{0.1,300})
 
 %%
 % A controller is synthesized using the hinfsyn command. 
