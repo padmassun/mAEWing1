@@ -1,7 +1,7 @@
 %DEMO script: generate an aeroelastic Geri state space model
 %Brian Danowsky, Systems Technology, Inc., 2018
 
-function [GeriFDsysPID, GeriFDsysPID2_IO] = GenerateGeriModel(Vmps)
+function [GeriFDsysPID, GeriFDsysPID2_IO] = GenerateGeriModelAP(Vmps)
 
 addpath('./..'); %path to model PID box functions including the model function
 addpath('../GeriACProps'); %path to model PID box functions including the model function

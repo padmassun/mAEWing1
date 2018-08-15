@@ -5,7 +5,7 @@
 % ########################################################################
 %
 % ### ANALYSIS PART ###
-% last modified 20/07/2018 Julian Theis
+% last modified 2018-08-15 Julian Theis
 %
 % RUN PART1_DESIGN_ROBUSTFLUTTERSUPPRESSION FIRST
 % uses variables in workspace, requires 
@@ -30,6 +30,7 @@ for ii=1:numel(Vinf)
     [~, temp] = GenerateGeriModelAP(Vinf(ii)); 
     P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
 end
+GeriFDsysPID2_IO = P; %to be used in AnalysisSimAP
 close all; clc
 
 w = {0.01, 1000}; %relevant frequency range for plotting
@@ -156,20 +157,9 @@ xlim([-60,10])
 ylim([-5,60])
 sgrid
 %% FURTHER ANALYSIS 
-% Mu Analysis with real parameters (I can set up an uncertain model, 
-% but we should first agree on the parameters. Plus I think, I require some more time)
-% * structured uncertainty descriptions
-%   ** real parametric uncertainty in structural mode frequencies and damping ratios
-%   ** real parametric uncertainty in air data, i.e. derivatives/coefficients
-
-% TIME SIMULATION WITH RATE LIMITS AND SATURATION
-% This is pretty easy to set up but we need to look at the avalaible
-% inputs/outputs first.
-
-% TIME SIMULATION (linear/quasi-linear) for multiple fixed airspeeds and/or time-varying airspeed
-% This should also be pretty straight forward
-% * step responses from elevator (control surfaces not in the loop)
-% * step disturbance responses at control surfaces in the loop
+% perform time-domain simulation in Simulink using rate-limited and
+% saturated control surfaces and the autopilot modules in the loop
+open AnalysisSimAp
 
 
 
