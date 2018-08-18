@@ -39,6 +39,8 @@ switch opts.mac
     case 'macxp' %same as 'macx' but with pole weighting. see same ref. NOT YET VALIDATED!!
         macfunc = @(v1,v2,lamb1,lamb2)(abs(v1'*v2)/abs(conj(lamb1) + lamb2) + abs(v1.'*v2)/abs(lamb1 + lamb2))^2/...
             ((v1'*v1/(2*abs(real(lamb1))) + abs(v1.'*v1)/(2*abs(lamb1)))*(v2'*v2/(2*abs(real(lamb2))) + abs(v2.'*v2)/(2*abs(lamb2))));
+    case 'poles' %just check relative distance between poles (does not work well)
+        macfunc = @(v1,v2,lamb1,lamb2)abs(lamb2-lamb1);
     otherwise
         error('opts.mac improperly set!!');
 end
