@@ -28,7 +28,8 @@ Vinf = 25:1:45;
 clear P
 for ii=1:numel(Vinf)
     [~, temp] = GenerateGeriModelAP(Vinf(ii)); 
-    P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
+    P(:,:,ii) = temp;
+%     P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
 end
 GeriFDsysPID2_IO = P; %to be used in AnalysisSimAP
 close all; clc
@@ -45,11 +46,8 @@ load BaseLineController
 AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
 AFCS({'L2','R2'},'p') = [1;-1]*RollDamper;         % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
-AFCS({'L3','R3'},'theta') = [1;1]*PitchController; % Pitch Angle Control
+AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
-% altitude loop still causes problems... the following implementation
-% produces nonminimal states
-% AFCS({'L3','R3'},'h') = [1;1]*PitchController*AltitudeController; 
 %% Robustness Margins
 % Robustness margins are calculated using the LOOPMARGIN command (called
 % inside the function DisplayLoopmargin which also prints the data to the workspace)
