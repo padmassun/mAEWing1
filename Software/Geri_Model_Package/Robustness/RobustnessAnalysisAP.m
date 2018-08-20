@@ -43,6 +43,7 @@ AFCS.OutputName = P.InputName;
 AFCS(C.OutputName,C.InputName) = C;    % Flutter Suppression
 
 load BaseLineController
+load standard_sos
 AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
 AFCS({'L2','R2'},'p') = [1;-1]*RollDamper;         % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
