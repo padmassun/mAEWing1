@@ -18,7 +18,10 @@
 %% Define Example System / Controller
  load example_geri %loads the required files to run this script as an example
 
-
+ %BEST MIDAAS Controller so far...
+%  load('C:\Users\bdanowsky\Documents\Work\1439 - PAAW\matlab\Geri_MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
+%  clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
+ 
 %% load some preliminary model stuff
 
 addpath('./..'); %path to model PID box functions including the model function
@@ -64,10 +67,11 @@ gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,mass
 
 %% generate models
 
-Vinf = 25:1:45;
+Vinf = 25:0.5:45;
 
 % generate complete model of the aircraft at various airspeeds
-% XXX still removing altitude state, as it causes problems in the analysis
+% XXX still removing altitude state, as it causes problems in the analysis (BPD: are you still doing
+% this? it doesn't appear that you are...)
 clear P
 for ii=1:numel(Vinf)
 %     [~, temp] = GenerateGeriModelAP(Vinf(ii));
@@ -90,6 +94,7 @@ load BaseLineController
 load standard_sos
 AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
 AFCS({'L2','R2'},'p') = [1;-1]*RollDamper;         % Roll Damper
+% AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;         % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
 AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
@@ -118,7 +123,7 @@ AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeControlle
 
 
 for ii=1:numel(Vinf)
-    fprintf('\nModel at airspeed %2.0f m/s:\n', Vinf(ii))
+    fprintf('\nModel at airspeed %2.1f m/s:\n', Vinf(ii))
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
  MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
@@ -128,35 +133,54 @@ end
 %calculate Robust and Absolute Flutter Speed
 
 [RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P,OCM_P,ICM_G,OCM_G,Vinf);
-fprintf('Robust Flutter Speed: %d \nAbsolute Flutter Speed: %d \n',RFS,AFS)
+fprintf('Robust Flutter Speed: %2.1f \nAbsolute Flutter Speed: %2.1f \n',RFS,AFS)
+
 
 % plot of minimum classical phase margin at input over airspeed
 InputPhase = ICM_P; InputPhase(InputPhase>=90)=90; InputPhase(InputPhase==0)=-Inf;
 figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
-area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+% area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
+legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical gain margin at input over airspeed
 InputGain = abs(db(ICM_G));
 figure; semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 40]);
 hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
-area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+% area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+ylims = vis.RFS_G_y;
+ylims(ylims==0) = 1;
+fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none'); hold off;
+ylim([1 100]);
+legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical phase margin at output over airspeed
 OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90; OutputPhase(OutputPhase==0)=-Inf;
 figure; plot(Vinf,OutputPhase,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
-area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+% area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
+legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical gain margin at output over airspeed
 OutputGain = abs(db(OCM_G));
 figure; semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]);
 hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
-area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+% area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+ylims = vis.RFS_G_y;
+ylims(ylims==0) = 1;
+fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none');
+ylim([1 100])
+legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
@@ -191,13 +215,15 @@ DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'si'); %plot allowable dynamic multiplic
 % * flutter speed predicted by root-loci (also under uncertainty)
 
 varypzmap(P)
+caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
-ylim([-5,60])
+ylim([0,60])
 sgrid
 
 varypzmap(feedback(P,AFCS))
+caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
-ylim([-5,60])
+ylim([0,60])
 sgrid
 %% FURTHER ANALYSIS 
 % perform time-domain simulation in Simulink using rate-limited and

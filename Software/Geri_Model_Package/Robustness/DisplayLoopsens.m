@@ -92,6 +92,7 @@ switch lower(option)
         ylim([0,2]);xlim([w{1},w{2}]);
         set (gca, 'Xscale', 'log');
         ylabel('Magnitude (abs)')
+        xlabel('Frequency (rad/s)')
         title(['Allowed multiplicative uncertainty at input ' int2str(ii) ' ("' G.InputName{ii} '")'])
         if exist('garyfyFigure','file');garyfyFigure; end
     end
@@ -104,6 +105,7 @@ switch lower(option)
         ylim([0,2]); xlim([w{1},w{2}]);
         set (gca, 'Xscale', 'log');
         ylabel('Singular Values (abs)')
+        xlabel('Frequency (rad/s)')
         title('Allowed unstructured multiplicative uncertainty at inputs')
         if exist('garyfyFigure','file');garyfyFigure; end
 
@@ -120,6 +122,7 @@ switch lower(option)
         ylim([0,2]);xlim([w{1},w{2}]);
         set (gca, 'Xscale', 'log');
         ylabel('Magnitude (abs)')
+        xlabel('Frequency (rad/s)')
         title(['Allowed multiplicative uncertainty at output ' int2str(ii) ' ("' G.OutputName{ii} '")'])
         if exist('garyfyFigure','file');garyfyFigure; end
     end
@@ -131,6 +134,7 @@ switch lower(option)
         [SV, W] = sigma(loops.To,w);
         area(W,1./SV(1,:));grid;ylim([0,2]);xlim([w{1},w{2}]);
         ylabel('Singular Values (abs)')
+        xlabel('Frequency (rad/s)')
         set (gca, 'Xscale', 'log');
         title('Allowed unstructured multiplicative uncertainty at outputs')
         if exist('garyfyFigure','file');garyfyFigure; end
@@ -141,6 +145,7 @@ switch lower(option)
     [SV, W] = sigma(loops.CSo,w);
         area(W,1./SV(1,:));grid;ylim([0,10]);xlim([w{1},w{2}]);
         ylabel('Singular Values (abs)')
+        xlabel('Frequency (rad/s)')
         set (gca, 'Xscale', 'log');
         title('Allowed additive plant uncertainty')
         if exist('garyfyFigure','file');garyfyFigure; end
