@@ -18,8 +18,51 @@
 %% Define Example System / Controller
  load example_geri %loads the required files to run this script as an example
 
-%%
 
+%% load some preliminary model stuff
+
+addpath('./..'); %path to model PID box functions including the model function
+addpath('../GeriACProps'); %path to model PID box functions including the model function
+addpath('../PAAW_IDBox'); %path to model PID box functions including the model function
+
+%load the data
+load GeriACProps/Geri_Database
+load GeriACProps/GerimassProp
+load GeriACProps/GeriaeroPropNOM
+
+%load initial guess and final data -----------------------------------------------------------------
+
+%nominal model (before PID update)
+load GeriACProps/GericoeffsNOM
+coeffdataNOM = coeffdata;
+coeffdataNOM.IputIx = [1:9];
+coeffdata.IputIx = [1:9]; %never change this, just means use all inputs
+
+%PID-updated coefficients
+indat = load('GeriACProps/GericoeffsPIDUpdate.mat');
+coeffdataPIDfull = indat.coeffsPIDfull;
+
+ft2m = 0.3048;
+
+load GeriActuators
+engine_lag = tf(1); %tf(4,[1 4]); %tf(1); %perfect engines (for now, can be changed later)
+actdata.G_surface_actuator = G_surface_actuator*Delay_25ms; %delays are included with actuators
+actdata.engine_lag = engine_lag*Delay_25ms; %delay is included with engine model
+
+load Geri_SensorModels
+sensdata.G_sens_IMU = G_sens_IMU;
+sensdata.G_sens_Accel = G_sens_Accel;
+
+ikeep = [1,2,3,4,5,6,7,8,9]; % all flaps + throttle
+okeep = [1 3 5 7 4 8 13:18]; %uses q and p (mean axis rates)
+% okeep = [1 3 5 7 10 11 13:18]; %uses qcg and pcg (sensor rates, more correct)
+
+%bare airframe as a function of velocity 
+gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,massProp,...
+    coeffdataPIDfull,actdata,sensdata);
+
+
+%% generate models
 
 Vinf = 25:1:45;
 
@@ -27,7 +70,8 @@ Vinf = 25:1:45;
 % XXX still removing altitude state, as it causes problems in the analysis
 clear P
 for ii=1:numel(Vinf)
-    [~, temp] = GenerateGeriModelAP(Vinf(ii)); 
+%     [~, temp] = GenerateGeriModelAP(Vinf(ii));
+    temp = gerifunc(Vinf(ii));
     P(:,:,ii) = temp;
 %     P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
 end
