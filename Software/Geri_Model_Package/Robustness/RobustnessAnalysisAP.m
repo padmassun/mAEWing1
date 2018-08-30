@@ -16,7 +16,7 @@
 % The controller needs to have the correct naming of inputs and outputs
 % (matching the GeriFDsysPID2_IO model)
 %% Define Example System / Controller
- load example_geri %loads the required files to run this script as an example
+ load HinfController %loads H-Infinity controller as an example
 
  %BEST MIDAAS Controller so far...
 %  load('C:\Users\bdanowsky\Documents\Work\1439 - PAAW\matlab\Geri_MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
@@ -57,8 +57,8 @@ sensdata.G_sens_IMU = G_sens_IMU;
 sensdata.G_sens_Accel = G_sens_Accel;
 
 ikeep = [1,2,3,4,5,6,7,8,9]; % all flaps + throttle
-okeep = [1 3 5 7 4 8 13:18]; %uses q and p (mean axis rates)
-% okeep = [1 3 5 7 10 11 13:18]; %uses qcg and pcg (sensor rates, more correct)
+% okeep = [1 3 5 7 4 8 13:18]; %uses q and p (mean axis rates)
+okeep = [1 3 5 7 10 11 13:18]; %uses qcg and pcg (sensor rates, more correct)
 
 %bare airframe as a function of velocity 
 gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,massProp,...
@@ -67,11 +67,9 @@ gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,mass
 
 %% generate models
 
-Vinf = 25:0.5:45;
+Vinf = 20:0.5:45;
 
 % generate complete model of the aircraft at various airspeeds
-% XXX still removing altitude state, as it causes problems in the analysis (BPD: are you still doing
-% this? it doesn't appear that you are...)
 clear P
 for ii=1:numel(Vinf)
 %     [~, temp] = GenerateGeriModelAP(Vinf(ii));
@@ -93,8 +91,7 @@ AFCS(C.OutputName,C.InputName) = C;    % Flutter Suppression
 load BaseLineController
 load standard_sos
 AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
-AFCS({'L2','R2'},'p') = [1;-1]*RollDamper;         % Roll Damper
-% AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;         % Roll Damper
+AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;       % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
 AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
