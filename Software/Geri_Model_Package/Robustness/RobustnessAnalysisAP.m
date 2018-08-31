@@ -18,8 +18,8 @@
 %% Define Example System / Controller
  load HinfController %loads H-Infinity controller as an example
 
- %BEST MIDAAS Controller so far...
-%  load('C:\Users\bdanowsky\Documents\Work\1439 - PAAW\matlab\Geri_MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
+%BEST MIDAAS Controller so far...
+%  load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
 %  clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
  
 %% load some preliminary model stuff
@@ -94,6 +94,7 @@ AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
 AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;       % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
 AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
+
 
 %% Robustness Margins
 % Robustness margins are calculated using the LOOPMARGIN command (called
@@ -179,6 +180,7 @@ ylim([1 100])
 legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
+
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
 % calculated by LOOPSENS:
@@ -222,57 +224,121 @@ caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
 ylim([0,60])
 sgrid
+
+
 %% FURTHER ANALYSIS 
 % perform time-domain simulation in Simulink using rate-limited and
 % saturated control surfaces and the autopilot modules in the loop
+
+%define rate limits in deg/s
+RLrise = 30;
+RLfall = -30;
+
+%define surface saturation limits in deg/s
+Sathi = 30;
+Satlw = -30;
+
+%build Controller for sim that may have I/O in different order
+Csim = ss(zeros(size(C)));
+Csim.outputname = P.inputname([1 2 7 8]);
+Csim.inputname = P.outputname([5:12]);
+Csim(C.OutputName,C.InputName) = C;
+
 open AnalysisSimAP
 sim('AnalysisSimAP');
 
 %disp('...waiting for simulation to finish...')
 %pause(60) %wait for simulation to finish. Is there a smarter way to do this?
 
-%
 
 figure
 subplot(411)
 plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(1).values,'LineWidth',3)
+grid on
 ylabel('Body Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
 subplot(412)
 plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(2).values,'LineWidth',3)
+grid on
 ylabel('Inboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
 subplot(413)
 plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(3).values,'LineWidth',3)
+grid on
 ylabel('Midboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
 subplot(414)
 plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(4).values,'LineWidth',3)
+grid on
 ylabel('Outboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
 
 figure
 subplot(211)
 plot(Sim_Accels.time,Sim_Accels.signals(1).values,'LineWidth',3)
+grid on
 ylabel('Fore Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
 subplot(212)
 plot(Sim_Accels.time,Sim_Accels.signals(2).values,'LineWidth',3)
+grid on
 ylabel('Aft Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
 
 figure
 subplot(411)
 plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(1).values,'LineWidth',3)
+grid on
 ylabel('Theta [deg]'), xlabel('Time [s]')
 subplot(412)
 plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(2).values,'LineWidth',3)
+grid on
 ylabel('Phi [deg]'), xlabel('Time [s]')
 subplot(413)
 plot(Sim_Rates.time,Sim_Rates.signals(1).values,'LineWidth',3)
+grid on
 ylabel('qcg [deg/s]'), xlabel('Time [s]')
 subplot(414)
 plot(Sim_Rates.time,Sim_Rates.signals(2).values,'LineWidth',3)
+grid on
 ylabel('pcg [deg/s]'), xlabel('Time [s]')
 
 figure
 subplot(211)
 plot(Sim_uh.time,Sim_uh.signals(1).values,'LineWidth',3)
+grid on
 ylabel('u'), xlabel('Time [s]')
 subplot(212)
 plot(Sim_uh.time,Sim_uh.signals(2).values,'LineWidth',3)
+grid on
 ylabel('h'), xlabel('Time [s]')
+
+figure
+subplot(211)
+plot(Sim_Rollcomm.time,Sim_Rollcomm.signals.values,'LineWidth',3)
+grid on
+ylabel('Roll Command [deg]'), xlabel('Time [s]')
+subplot(212)
+plot(Sim_Pitchcomm.time,Sim_Pitchcomm.signals.values,'LineWidth',3)
+grid on
+ylabel('Pitch Command [deg]'), xlabel('Time [s]')
+
+figure;
+for ind = 1:size(P,2)-1
+    subplot(size(P,2)-1,1,ind)
+    plot(Sim_RLerror.time,Sim_RLerror.signals.values(:,ind),'LineWidth',3)
+    ylabel([P.inputname{ind}, ' [' P.inputunit{ind} ']']);
+    grid on
+    if ind == 1
+        title('Rate Limit Error')
+    end
+end
+xlabel('Time [s]')
+
+figure;
+for ind = 1:size(P,2)-1
+    subplot(size(P,2)-1,1,ind)
+    plot(Sim_SatError.time,Sim_SatError.signals.values(:,ind),'LineWidth',3)
+    ylabel([P.inputname{ind}, ' [' P.inputunit{ind} ']']);
+    grid on
+    if ind == 1
+        title('Saturation Limit Error')
+    end
+end
+xlabel('Time [s]')
+
+
