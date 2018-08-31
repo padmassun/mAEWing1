@@ -225,7 +225,54 @@ sgrid
 %% FURTHER ANALYSIS 
 % perform time-domain simulation in Simulink using rate-limited and
 % saturated control surfaces and the autopilot modules in the loop
-open AnalysisSimAp
+open AnalysisSimAP
+sim('AnalysisSimAP');
 
+%disp('...waiting for simulation to finish...')
+%pause(60) %wait for simulation to finish. Is there a smarter way to do this?
 
+%
 
+figure
+subplot(411)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(1).values,'LineWidth',3)
+ylabel('Body Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(412)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(2).values,'LineWidth',3)
+ylabel('Inboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(413)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(3).values,'LineWidth',3)
+ylabel('Midboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(414)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(4).values,'LineWidth',3)
+ylabel('Outboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+
+figure
+subplot(211)
+plot(Sim_Accels.time,Sim_Accels.signals(1).values,'LineWidth',3)
+ylabel('Fore Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
+subplot(212)
+plot(Sim_Accels.time,Sim_Accels.signals(2).values,'LineWidth',3)
+ylabel('Aft Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
+
+figure
+subplot(411)
+plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(1).values,'LineWidth',3)
+ylabel('Theta [deg]'), xlabel('Time [s]')
+subplot(412)
+plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(2).values,'LineWidth',3)
+ylabel('Phi [deg]'), xlabel('Time [s]')
+subplot(413)
+plot(Sim_Rates.time,Sim_Rates.signals(1).values,'LineWidth',3)
+ylabel('qcg [deg/s]'), xlabel('Time [s]')
+subplot(414)
+plot(Sim_Rates.time,Sim_Rates.signals(2).values,'LineWidth',3)
+ylabel('pcg [deg/s]'), xlabel('Time [s]')
+
+figure
+subplot(211)
+plot(Sim_uh.time,Sim_uh.signals(1).values,'LineWidth',3)
+ylabel('u'), xlabel('Time [s]')
+subplot(212)
+plot(Sim_uh.time,Sim_uh.signals(2).values,'LineWidth',3)
+ylabel('h'), xlabel('Time [s]')
