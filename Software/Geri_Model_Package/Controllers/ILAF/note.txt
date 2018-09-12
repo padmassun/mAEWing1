@@ -1,0 +1,40 @@
+From: David Schmidt <dschmidt@uccs.edu> 
+Sent: Wednesday, September 05, 2018 11:21 AM
+To: Brian P. Danowsky <bdanowsky@systemstech.com>
+Cc: julian.theis@tuhh.de; Peter Seiler <seile017@umn.edu>; Aditya Kotikalpudi <aditya@systemstech.com>
+Subject: Re: Geri controller structure
+
+Brian and colleagues, 
+
+I would like to impose on Brian and/or Julian and ask them to exercise their controller-evaluation codes on the attached controller for Geri AFS (change “tam” to “mat” in the file mat-file extension). This controller is SISO, but the state-space realization has been expanded to be compatible with the I/O configuration defined in Brian’s email below. Also, the Bode gain is scheduled as described in the script named GeriAFS_Gain_Schedule.m. The gain schedule can be implemented by multiplying all compensator outputs by a scale factor that ranges between 1 and 2 (as noted in the gain-schedule script). And the scale factor and controller then act in a series connection, or SF*compensator. The Gain_Schedule script does not build this series system, it just describes the gain schedule itself. So you can manipulate this scheduling to be compatible with your software.
+
+Also attached in a PowerPoint file that shown the results I have obtained in my evaluations. The predicted absolute flutter speed is 36.7 m/sec, and the predicted robust flutter speed is 34.1 m/sec. In ll cases, the minimum margins are at the accelerometer measurements in the loops.
+
+Let me know if you have any questions, and thanks for all your help on this task.
+
+Dave
+
+
+On Aug 31, 2018, at 3:46 PM, Brian P. Danowsky <bdanowsky@systemstech.com> wrote:
+
+Dave,
+ 
+If you can build your controller so it has the following I/O with corresponding units, then it will be easily implementable with the script. The gain scheduling part will require a little further modification but it shouldn’t be that difficult. As long as you can supply the details of the scheduling, it should be no problem.
+ 
+Outputs
+    '1 : L1 [rad]'
+    '2 : R1 [rad]'
+    '3 : L4 [rad]'
+    '4 : R4 [rad]'
+ 
+Inputs
+    '1 : qcg        [rad/s ]'
+    '2 : pcg        [rad/s ]'
+    '3 : nzCBfwd    [ft/s^2]'
+    '4 : nzCBaft    [ft/s^2]'
+    '5 : nzLwingfwd [ft/s^2]'
+    '6 : nzLwingaft [ft/s^2]'
+    '7 : nzRwingfwd [ft/s^2]'
+    '8 : nzRwingaft [ft/s^2]'
+ 
+Brian

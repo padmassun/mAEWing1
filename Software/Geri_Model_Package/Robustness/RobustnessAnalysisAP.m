@@ -16,19 +16,66 @@
 % The controller needs to have the correct naming of inputs and outputs
 % (matching the GeriFDsysPID2_IO model)
 %% Define Example System / Controller
- load example_geri %loads the required files to run this script as an example
+ load HinfController %loads H-Infinity controller as an example
 
-%%
+%BEST MIDAAS Controller so far...
+%  load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
+%  clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
+ 
+%% load some preliminary model stuff
+
+addpath('./..'); %path to model PID box functions including the model function
+addpath('../GeriACProps'); %path to model PID box functions including the model function
+addpath('../PAAW_IDBox'); %path to model PID box functions including the model function
+
+%load the data
+load GeriACProps/Geri_Database
+load GeriACProps/GerimassProp
+load GeriACProps/GeriaeroPropNOM
+
+%load initial guess and final data -----------------------------------------------------------------
+
+%nominal model (before PID update)
+load GeriACProps/GericoeffsNOM
+coeffdataNOM = coeffdata;
+coeffdataNOM.IputIx = [1:9];
+coeffdata.IputIx = [1:9]; %never change this, just means use all inputs
+
+%PID-updated coefficients
+indat = load('GeriACProps/GericoeffsPIDUpdate.mat');
+coeffdataPIDfull = indat.coeffsPIDfull;
+
+ft2m = 0.3048;
+
+load GeriActuators
+engine_lag = tf(1); %tf(4,[1 4]); %tf(1); %perfect engines (for now, can be changed later)
+actdata.G_surface_actuator = G_surface_actuator*Delay_25ms; %delays are included with actuators
+actdata.engine_lag = engine_lag*Delay_25ms; %delay is included with engine model
+
+load Geri_SensorModels
+sensdata.G_sens_IMU = G_sens_IMU;
+sensdata.G_sens_Accel = G_sens_Accel;
+
+ikeep = [1,2,3,4,5,6,7,8,9]; % all flaps + throttle
+% okeep = [1 3 5 7 4 8 13:18]; %uses q and p (mean axis rates)
+okeep = [1 3 5 7 10 11 13:18]; %uses qcg and pcg (sensor rates, more correct)
+
+%bare airframe as a function of velocity 
+gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,massProp,...
+    coeffdataPIDfull,actdata,sensdata);
 
 
-Vinf = 25:1:45;
+%% generate models
+
+Vinf = 20:0.5:45;
 
 % generate complete model of the aircraft at various airspeeds
-% XXX still removing altitude state, as it causes problems in the analysis
 clear P
 for ii=1:numel(Vinf)
-    [~, temp] = GenerateGeriModelAP(Vinf(ii)); 
-    P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
+%     [~, temp] = GenerateGeriModelAP(Vinf(ii));
+    temp = gerifunc(Vinf(ii));
+    P(:,:,ii) = temp;
+%     P(:,:,ii) = modred(temp([1:2,4:12],:),17,'truncate');
 end
 GeriFDsysPID2_IO = P; %to be used in AnalysisSimAP
 close all; clc
@@ -42,14 +89,13 @@ AFCS.OutputName = P.InputName;
 AFCS(C.OutputName,C.InputName) = C;    % Flutter Suppression
 
 load BaseLineController
+load standard_sos
 AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
-AFCS({'L2','R2'},'p') = [1;-1]*RollDamper;         % Roll Damper
+AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;       % Roll Damper
 AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
-AFCS({'L3','R3'},'theta') = [1;1]*PitchController; % Pitch Angle Control
+AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
-% altitude loop still causes problems... the following implementation
-% produces nonminimal states
-% AFCS({'L3','R3'},'h') = [1;1]*PitchController*AltitudeController; 
+
 %% Robustness Margins
 % Robustness margins are calculated using the LOOPMARGIN command (called
 % inside the function DisplayLoopmargin which also prints the data to the workspace)
@@ -75,7 +121,7 @@ AFCS({'L3','R3'},'theta') = [1;1]*PitchController; % Pitch Angle Control
 
 
 for ii=1:numel(Vinf)
-    fprintf('\nModel at airspeed %2.0f m/s:\n', Vinf(ii))
+    fprintf('\nModel at airspeed %2.1f m/s:\n', Vinf(ii))
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
  MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
@@ -85,35 +131,55 @@ end
 %calculate Robust and Absolute Flutter Speed
 
 [RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P,OCM_P,ICM_G,OCM_G,Vinf);
-fprintf('Robust Flutter Speed: %d \nAbsolute Flutter Speed: %d \n',RFS,AFS)
+fprintf('Robust Flutter Speed: %2.1f \nAbsolute Flutter Speed: %2.1f \n',RFS,AFS)
+
 
 % plot of minimum classical phase margin at input over airspeed
 InputPhase = ICM_P; InputPhase(InputPhase>=90)=90; InputPhase(InputPhase==0)=-Inf;
 figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
-area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+% area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
+legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical gain margin at input over airspeed
 InputGain = abs(db(ICM_G));
 figure; semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 40]);
 hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
-area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+% area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+ylims = vis.RFS_G_y;
+ylims(ylims==0) = 1;
+fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none'); hold off;
+ylim([1 100]);
+legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical phase margin at output over airspeed
 OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90; OutputPhase(OutputPhase==0)=-Inf;
 figure; plot(Vinf,OutputPhase,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
-area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+% area(vis.RFS_P_x, vis.RFS_P_y); hold off;
+fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
+legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
 
 % plot of minimum classical gain margin at output over airspeed
 OutputGain = abs(db(OCM_G));
 figure; semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.OutputName(:),'Location','southwest')
 xlim([Vinf(1) Vinf(end)]);
 hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
-area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+% area(vis.RFS_G_x, vis.RFS_G_y); hold off;
+ylims = vis.RFS_G_y;
+ylims(ylims==0) = 1;
+fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none');
+ylim([1 100])
+legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+grid on
+
 
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
@@ -148,18 +214,131 @@ DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'si'); %plot allowable dynamic multiplic
 % * flutter speed predicted by root-loci (also under uncertainty)
 
 varypzmap(P)
+caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
-ylim([-5,60])
+ylim([0,60])
 sgrid
 
 varypzmap(feedback(P,AFCS))
+caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
-ylim([-5,60])
+ylim([0,60])
 sgrid
+
+
 %% FURTHER ANALYSIS 
 % perform time-domain simulation in Simulink using rate-limited and
 % saturated control surfaces and the autopilot modules in the loop
-open AnalysisSimAp
 
+%define rate limits in deg/s
+RLrise = 30;
+RLfall = -30;
+
+%define surface saturation limits in deg/s
+Sathi = 30;
+Satlw = -30;
+
+%build Controller for sim that may have I/O in different order
+Csim = ss(zeros(size(C)));
+Csim.outputname = P.inputname([1 2 7 8]);
+Csim.inputname = P.outputname([5:12]);
+Csim(C.OutputName,C.InputName) = C;
+
+open AnalysisSimAP
+sim('AnalysisSimAP');
+
+%disp('...waiting for simulation to finish...')
+%pause(60) %wait for simulation to finish. Is there a smarter way to do this?
+
+
+figure
+subplot(411)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(1).values,'LineWidth',3)
+grid on
+ylabel('Body Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(412)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(2).values,'LineWidth',3)
+grid on
+ylabel('Inboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(413)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(3).values,'LineWidth',3)
+grid on
+ylabel('Midboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+subplot(414)
+plot(Sim_SurfaceDeflections.time,Sim_SurfaceDeflections.signals(4).values,'LineWidth',3)
+grid on
+ylabel('Outboard Flaps [deg]'), xlabel('Time [s]'), legend('left','right')
+
+figure
+subplot(211)
+plot(Sim_Accels.time,Sim_Accels.signals(1).values,'LineWidth',3)
+grid on
+ylabel('Fore Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
+subplot(212)
+plot(Sim_Accels.time,Sim_Accels.signals(2).values,'LineWidth',3)
+grid on
+ylabel('Aft Accelerometers'), xlabel('Time [s]'), legend('left','center','right')
+
+figure
+subplot(411)
+plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(1).values,'LineWidth',3)
+grid on
+ylabel('Theta [deg]'), xlabel('Time [s]')
+subplot(412)
+plot(Sim_ThetaPhi.time,Sim_ThetaPhi.signals(2).values,'LineWidth',3)
+grid on
+ylabel('Phi [deg]'), xlabel('Time [s]')
+subplot(413)
+plot(Sim_Rates.time,Sim_Rates.signals(1).values,'LineWidth',3)
+grid on
+ylabel('qcg [deg/s]'), xlabel('Time [s]')
+subplot(414)
+plot(Sim_Rates.time,Sim_Rates.signals(2).values,'LineWidth',3)
+grid on
+ylabel('pcg [deg/s]'), xlabel('Time [s]')
+
+figure
+subplot(211)
+plot(Sim_uh.time,Sim_uh.signals(1).values,'LineWidth',3)
+grid on
+ylabel('u'), xlabel('Time [s]')
+subplot(212)
+plot(Sim_uh.time,Sim_uh.signals(2).values,'LineWidth',3)
+grid on
+ylabel('h'), xlabel('Time [s]')
+
+figure
+subplot(211)
+plot(Sim_Rollcomm.time,Sim_Rollcomm.signals.values,'LineWidth',3)
+grid on
+ylabel('Roll Command [deg]'), xlabel('Time [s]')
+subplot(212)
+plot(Sim_Pitchcomm.time,Sim_Pitchcomm.signals.values,'LineWidth',3)
+grid on
+ylabel('Pitch Command [deg]'), xlabel('Time [s]')
+
+figure;
+for ind = 1:size(P,2)-1
+    subplot(size(P,2)-1,1,ind)
+    plot(Sim_RLerror.time,Sim_RLerror.signals.values(:,ind),'LineWidth',3)
+    ylabel([P.inputname{ind}, ' [' P.inputunit{ind} ']']);
+    grid on
+    if ind == 1
+        title('Rate Limit Error')
+    end
+end
+xlabel('Time [s]')
+
+figure;
+for ind = 1:size(P,2)-1
+    subplot(size(P,2)-1,1,ind)
+    plot(Sim_SatError.time,Sim_SatError.signals.values(:,ind),'LineWidth',3)
+    ylabel([P.inputname{ind}, ' [' P.inputunit{ind} ']']);
+    grid on
+    if ind == 1
+        title('Saturation Limit Error')
+    end
+end
+xlabel('Time [s]')
 
 

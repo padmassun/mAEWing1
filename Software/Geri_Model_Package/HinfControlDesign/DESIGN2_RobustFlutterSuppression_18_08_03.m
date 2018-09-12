@@ -314,8 +314,8 @@ area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 %%
 
 
-ClosedLoop = feedback(GeriFDsysPID2_IO,C,'names')
-ClosedLoop_CSi = feedback(C,GeriFDsysPID2_IO(C.InputName,C.OutputName),'names')
+ClosedLoop = feedback(GeriFDsysPID2_IO,C,'names');
+ClosedLoop_CSi = feedback(C,GeriFDsysPID2_IO(C.InputName,C.OutputName),'names');
 
 step(GeriFDsysPID2_IO(:,5:6,1:15)*[-1 ; -1]*pi/180,ClosedLoop(:,5:6,1:15)*[-1 ; -1]*pi/180,0.4)
 
