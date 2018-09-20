@@ -18,25 +18,30 @@
 %% Define Example System / Controller
 
 Vinf = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
+ControllerSelection = 'ILAF' % 'MIDAAS' 'HINF'
 
-% HINF Controller
-% load('HinfController.mat')
+switch ControllerSelection
+    case 'HINF' % HINF Controller
+    load('HinfController.mat')
 
-% MIDAAS Controller 
-%  load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
-%  clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
+    case 'MIDAAS' % MIDAAS Controller 
+    load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
+    clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
 
-% ILAF Controller
-%   load('..\Controllers\ILAF\GeriAFSC_4x8.mat');
-%   C = -Cont34_4x8;
-%   C.OutputName = {'L1', 'R1', 'L4', 'R4'};
-%   C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
-%   TAS = Vinf;
-%   SF = zeros(1,1,numel(TAS));
-%   SF(TAS<=34) = 1;
-%   SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: NOTE THAT THIS GOES BEYOND THE ORIGINAL TABLE, could be easily adapted
-%   C = SF*C; C.OutputName = {'L1', 'R1', 'L4', 'R4'};
-
+    case 'ILAF' % ILAF Controller
+    load('..\Controllers\ILAF\GeriAFSC_4x8.mat');
+    C = -Cont34_4x8;
+    C.OutputName = {'L1', 'R1', 'L4', 'R4'};
+    C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
+    TAS = Vinf;
+    SF = zeros(1,1,numel(TAS));
+    SF(TAS<=34) = 1;
+    SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: NOTE THAT THIS GOES BEYOND THE ORIGINAL TABLE, could be easily adapted
+    C = SF*C; C.OutputName = {'L1', 'R1', 'L4', 'R4'};
+    
+    otherwise
+        disp('please select HINF, MIDAAS, or ILAF')
+end
 
 %% load some preliminary model stuff
 if size(C,3) == 1 %if controller not gain scheduled
@@ -257,13 +262,22 @@ Sathi = 30;
 Satlw = -30;
 
 %build Controller for sim that may have I/O in different order
+% Csim = ss(zeros(size(C)));
+% Csim.outputname = P.inputname([1 2 7 8]);
+% Csim.inputname = P.outputname([5:12]);
+% Csim(C.OutputName,C.InputName) = C(:,:,Vinf==RFS); % JT: This must still be changed for Simulink Gain-Scheduled Simulation
+% open AnalysisSimAP
+% sim('AnalysisSimAP');
+
+%build Controller for sim that may have I/O in different order incl gain
+%scheduling
 Csim = ss(zeros(size(C)));
 Csim.outputname = P.inputname([1 2 7 8]);
 Csim.inputname = P.outputname([5:12]);
-Csim(C.OutputName,C.InputName) = C(:,:,Vinf==RFS); % JT: This must still be changed for Simulink Gain-Scheduled Simulation
-
-open AnalysisSimAP
-sim('AnalysisSimAP');
+Csim(C.OutputName,C.InputName,:) = C(:,:,:);
+Csim_discrete = c2d(Csim,1/151,'tustin');
+open AnalysisSimAP_2016a
+sim('AnalysisSimAP_2016a');
 
 %disp('...waiting for simulation to finish...')
 %pause(60) %wait for simulation to finish. Is there a smarter way to do this?
