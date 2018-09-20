@@ -16,13 +16,32 @@
 % The controller needs to have the correct naming of inputs and outputs
 % (matching the GeriFDsysPID2_IO model)
 %% Define Example System / Controller
- load HinfController %loads H-Infinity controller as an example
 
-%BEST MIDAAS Controller so far...
+Vinf = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
+
+% HINF Controller
+% load('HinfController.mat')
+
+% MIDAAS Controller 
 %  load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
 %  clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
- 
+
+% ILAF Controller
+%   load('..\Controllers\ILAF\GeriAFSC_4x8.mat');
+%   C = -Cont34_4x8;
+%   C.OutputName = {'L1', 'R1', 'L4', 'R4'};
+%   C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
+%   TAS = Vinf;
+%   SF = zeros(1,1,numel(TAS));
+%   SF(TAS<=34) = 1;
+%   SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: NOTE THAT THIS GOES BEYOND THE ORIGINAL TABLE, could be easily adapted
+%   C = SF*C; C.OutputName = {'L1', 'R1', 'L4', 'R4'};
+
+
 %% load some preliminary model stuff
+if size(C,3) == 1 %if controller not gain scheduled
+    C(:,:,1:numel(Vinf)) = C; % expand controller into scheduling dimension for compatability
+end
 
 addpath('./..'); %path to model PID box functions including the model function
 addpath('../GeriACProps'); %path to model PID box functions including the model function
@@ -67,8 +86,6 @@ gerifunc = @(Vmps)NdofwActSens(okeep,ikeep,AEC6,ModeShape,FEM,Vmps,aeroProp,mass
 
 %% generate models
 
-Vinf = 20:0.5:45;
-
 % generate complete model of the aircraft at various airspeeds
 clear P
 for ii=1:numel(Vinf)
@@ -82,18 +99,18 @@ close all; clc
 
 w = {0.01, 1000}; %relevant frequency range for plotting
 
-AFCS = ss(zeros(size(P,2),size(P,1)));
-AFCS.InputName = P.OutputName;
+AFCS = ss(zeros(size(P,2),size(P,1),numel(Vinf)));
+AFCS.InputName  = P.OutputName;
 AFCS.OutputName = P.InputName;
 
-AFCS(C.OutputName,C.InputName) = C;    % Flutter Suppression
+AFCS(C.OutputName,C.InputName,:) = C;    % Flutter Suppression
 
 load BaseLineController
 load standard_sos
-AFCS('Thrust','u') = AutoThrottle;                 % Autothrottle
-AFCS({'L2','R2'},'pcg') = [1;-1]*RollDamper;       % Roll Damper
-AFCS({'L2','R2'},'phi') = [1;-1]*RollController;   % Bank Angle Control
-AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
+AFCS('Thrust','u',:) = AutoThrottle;                 % Autothrottle
+AFCS({'L2','R2'},'pcg',:) = [1;-1]*RollDamper;       % Roll Damper
+AFCS({'L2','R2'},'phi',:) = [1;-1]*RollController;   % Bank Angle Control
+AFCS({'L3','R3'},{'theta','h'},:) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
 
 %% Robustness Margins
@@ -120,12 +137,13 @@ AFCS({'L3','R3'},{'theta','h'}) = [1;1]*ss(PitchController)*[1 AltitudeControlle
 %  ** (symmetric) disk margins
 
 
+
 for ii=1:numel(Vinf)
     fprintf('\nModel at airspeed %2.1f m/s:\n', Vinf(ii))
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
  MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
- DisplayLoopmargin(P(:,:,ii),AFCS);
+ DisplayLoopmargin(P(:,:,ii),AFCS(:,:,ii));
 end
 
 %calculate Robust and Absolute Flutter Speed
@@ -198,13 +216,13 @@ grid on
 % ** combinations of dynamic actuator, plant, and sensor uncertainty
 
 % check at robust flutter speed
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'g'); %plot gang of six Singular Values
+DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'g'); %plot gang of six Singular Values
 
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'ua'); %plot allowable dynamic additive uncertainty
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
-[~, Peaks] = DisplayLoopsens(P(:,:,Vinf==RFS),AFCS,w,'so') %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
+DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'ua'); %plot allowable dynamic additive uncertainty
+DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
+[~, Peaks] = DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'so') %plot allowable dynamic multiplicative uncertainty in each input
 
 
 
@@ -242,7 +260,7 @@ Satlw = -30;
 Csim = ss(zeros(size(C)));
 Csim.outputname = P.inputname([1 2 7 8]);
 Csim.inputname = P.outputname([5:12]);
-Csim(C.OutputName,C.InputName) = C;
+Csim(C.OutputName,C.InputName) = C(:,:,Vinf==RFS); % JT: This must still be changed for Simulink Gain-Scheduled Simulation
 
 open AnalysisSimAP
 sim('AnalysisSimAP');
