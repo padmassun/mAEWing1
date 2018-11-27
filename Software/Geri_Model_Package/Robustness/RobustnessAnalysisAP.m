@@ -2,7 +2,7 @@
 %   Robust Control Design for Active Flutter Suppression
 % #######################################################################
 %   Julian Theis, Peter Seiler
-% ########################################################################
+% #######################################################################
 %
 % ### ANALYSIS PART ###
 % last modified 2018-08-15 Julian Theis
@@ -18,7 +18,7 @@
 %% Define Example System / Controller
 
 Vinf = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'ILAF' % 'MIDAAS' 'HINF'
+ControllerSelection = 'MIDAAS' %'HINF' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -27,7 +27,9 @@ switch ControllerSelection
     case 'MIDAAS' % MIDAAS Controller 
     load('..\Controllers\MIDAAS\Geri_MIDAAS_FluttSuppr_Rnd2_SET08_wrolloff.mat');
     clear GeriFDsysPID2_IO %get rid of this to avoid conflicts
-
+    C.OutputName = {'L1', 'R1', 'L4', 'R4'};
+    C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
+    
     case 'ILAF' % ILAF Controller
     load('..\Controllers\ILAF\GeriAFSC_4x8.mat');
     C = -Cont34_4x8;
@@ -151,35 +153,93 @@ for ii=1:numel(Vinf)
  DisplayLoopmargin(P(:,:,ii),AFCS(:,:,ii));
 end
 
-%calculate Robust and Absolute Flutter Speed
 
+% Roll Control AP Loop Robustness Check %JT: This is a little ad hoc, but
+% should work
+contrf = 1:9; measf = 1:12; contr = [3 4]; meas = [4 6]; alloc = [1 -1];
+Paug = feedback(P,minreal(AFCS(contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))))),contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))));
+Paug = minreal(Paug(meas,contr)*alloc');
+Paug.InputName = {'L2-R2'};
+AP = alloc*minreal(AFCS(contr,meas));
+AP.OutputName = {'L2-R2'};
+for ii=1:numel(Vinf)
+    fprintf('\nRoll AP: Model at airspeed %2.1f m/s:\n', Vinf(ii))
+    [ICM_G_roll(:,ii), ICM_P_roll(:,ii), ICM_D_roll(:,ii), IDM_G_roll(:,ii), IDM_P_roll(:,ii), ...
+     OCM_G_roll(:,ii), OCM_P_roll(:,ii), OCM_D_roll(:,ii), ODM_G_roll(:,ii), ODM_P_roll(:,ii), ...
+     MMI_G_roll(:,ii), MMI_P_roll(:,ii), MMO_G_roll(:,ii), MMO_P_roll(:,ii), MMIO_G_roll(:,ii), MMIO_P_roll(:,ii)] = ...
+    DisplayLoopmargin(Paug(:,:,ii),AP(:,:,ii));
+end
+
+
+% Pitch Control AP Loop Robustness Check 
+contrf = 1:9; measf = 1:12; contr = [5 6]; meas = [2 3]; alloc = [1 1];
+Paug = feedback(P,minreal(AFCS(contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))))),contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))));
+Paug = minreal(Paug(meas,contr)*alloc');
+Paug.InputName = {'L3+R3'};
+AP = alloc*minreal(AFCS(contr,meas));
+AP.OutputName = {'L3+R3'};
+for ii=1:numel(Vinf)
+    fprintf('\nPitch AP: Model at airspeed %2.1f m/s:\n', Vinf(ii))
+    [ICM_G_pitch(:,ii), ICM_P_pitch(:,ii), ICM_D_pitch(:,ii), IDM_G_pitch(:,ii), IDM_P_pitch(:,ii), ...
+     OCM_G_pitch(:,ii), OCM_P_pitch(:,ii), OCM_D_pitch(:,ii), ODM_G_pitch(:,ii), ODM_P_pitch(:,ii), ...
+     MMI_G_pitch(:,ii), MMI_P_pitch(:,ii), MMO_G_pitch(:,ii), MMO_P_pitch(:,ii), MMIO_G_pitch(:,ii), MMIO_P_roll(:,ii)] = ...
+    DisplayLoopmargin(Paug(:,:,ii),AP(:,:,ii));
+end
+
+ICM_P = [ICM_P; ICM_P_roll; ICM_P_pitch];
+ICM_G = [ICM_G; ICM_G_roll; ICM_G_pitch];
+
+%calculate Robust and Absolute Flutter Speed
 [RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P,OCM_P,ICM_G,OCM_G,Vinf);
 fprintf('Robust Flutter Speed: %2.1f \nAbsolute Flutter Speed: %2.1f \n',RFS,AFS)
 
 
 % plot of minimum classical phase margin at input over airspeed
+set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
+                                        0.4937    0.2780    0.9119
+                                        0.3999    0.4564    0.9832
+                                        0.3001    0.6139    0.8594
+                                        0.2301    0.7377    0.6762
+                                        0.2968    0.8270    0.4643
+                                        0.3778    0.8968    0.2928
+                                        0.6180    0.9255    0.3314
+                                        0.8000    0.9255    0.3529],...
+      'DefaultAxesLineStyleOrder','-|-.|:|--')
+  
 InputPhase = ICM_P; InputPhase(InputPhase>=90)=90; InputPhase(InputPhase==0)=-Inf;
-figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.InputName(:),'Location','southwest')
+figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
-% area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
-legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([P.InputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
 % plot of minimum classical gain margin at input over airspeed
 InputGain = abs(db(ICM_G));
-figure; semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');legend(P.InputName(:),'Location','southwest')
+figure; semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');
 xlim([Vinf(1) Vinf(end)]); ylim([0 40]);
 hold on; plot([AFS AFS],[1 100],'k--','LineWidth',3); 
-% area(vis.RFS_G_x, vis.RFS_G_y); hold off;
 ylims = vis.RFS_G_y;
 ylims(ylims==0) = 1;
 fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none'); hold off;
 ylim([1 100]);
-legend([P.InputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([P.InputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
+
+set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
+                                        0.5139    0.2199    0.8542
+                                        0.4451    0.3603    0.9842
+                                        0.3849    0.4873    0.9746
+                                        0.3092    0.6009    0.8722
+                                        0.2246    0.7011    0.7448
+                                        0.2527    0.7706    0.6044
+                                        0.3030    0.8330    0.4453
+                                        0.3553    0.8867    0.2935
+                                        0.4938    0.9181    0.3081
+                                        0.6713    0.9255    0.3375
+                                        0.8000    0.9255    0.3529])
+                                    
 % plot of minimum classical phase margin at output over airspeed
 OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90; OutputPhase(OutputPhase==0)=-Inf;
 figure; plot(Vinf,OutputPhase,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');legend(P.OutputName(:),'Location','southwest')
@@ -187,7 +247,7 @@ xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
 % area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
-legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([P.OutputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
 % plot of minimum classical gain margin at output over airspeed
@@ -203,7 +263,7 @@ ylim([1 100])
 legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
-
+set(groot,'defaultAxesColorOrder','remove')
 %% Closed-Loop Transfer Function Analysis
 % All relevant closed-loop (or broken loop) transfer functions are 
 % calculated by LOOPSENS:
