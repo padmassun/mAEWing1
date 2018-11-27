@@ -20,22 +20,22 @@ if nargin<7;GMthresh = 6;end
 if nargin<6;PMthresh = 45;end
 
 [~,Vidx] = find(ICM_P<=PMthresh);
-RFS_ICM_P = Vinf(min(Vidx)-1);
+RFS_ICM_P = Vinf(max(min(Vidx)-1,1));
 [~,Vidx] = find(ICM_P==0);
 AFS_ICM_P = Vinf(min(Vidx));
 
 [~,Vidx] = find(OCM_P<=PMthresh);
-RFS_OCM_P = Vinf(min(Vidx)-1);
+RFS_OCM_P = Vinf(max(min(Vidx)-1,1));
 [~,Vidx] = find(OCM_P==0);
 AFS_OCM_P = Vinf(min(Vidx));
 
 [~,Vidx] = find(abs(db(ICM_G))<=GMthresh);
-RFS_ICM_G = Vinf(min(Vidx)-1);
+RFS_ICM_G = Vinf(max(min(Vidx)-1,1));
 [~,Vidx] = find(abs(ICM_G)==0);
 AFS_ICM_G = Vinf(min(Vidx));
 
 [~,Vidx] = find(abs(db(OCM_G))<=GMthresh);
-RFS_OCM_G = Vinf(min(Vidx)-1);
+RFS_OCM_G = Vinf(max(min(Vidx)-1,1));
 [~,Vidx] = find(abs(OCM_G)==0);
 AFS_OCM_G = Vinf(min(Vidx));
 
