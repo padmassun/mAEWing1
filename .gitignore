@@ -224,8 +224,9 @@ pip-log.txt
 /FlightTests
 /Simulation/Controllers/baseline_control_grt_rtw
 /Models
-/Simulation/Controllers/slprj
-/Simulation/Libraries/slprj
+
+/Simulation/*/slprj
+/Simulation/*/slxc
 Software/FlightCode/output
 Software/FlightCode/cygmpfr-1.dll
 Software/FlightCode/cyggmp-3.dll
