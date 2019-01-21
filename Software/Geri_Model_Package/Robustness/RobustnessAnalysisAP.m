@@ -18,7 +18,7 @@
 %% Define Example System / Controller
 
 Vinf = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'MIDAAS' %'HINF' %'ILAF' 
+ControllerSelection = 'MIDAAS', %'HINF' %'MIDAAS' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -106,19 +106,23 @@ close all; clc
 
 w = {0.01, 1000}; %relevant frequency range for plotting
 
-AFCS = ss(zeros(size(P,2),size(P,1),numel(Vinf)));
+%% Consider IOs as suggested by BPD 2019-01-18:
+AFCS = ss(zeros(size(P,2)-2,size(P,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
 AFCS.InputName  = P.OutputName;
-AFCS.OutputName = P.InputName;
+AFCS.OutputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
+
+InputAllocP = ss(blkdiag(1,1,[1 -1], [1 1], 1, 1, 1)');
+InputAllocP.InputName = {'L1','R1','elevator','aileron','L4','R4','Thrust'};
+InputAllocP.OutputName = P.InputName;
 
 AFCS(C.OutputName,C.InputName,:) = C;    % Flutter Suppression
 
 load BaseLineController
 load standard_sos
 AFCS('Thrust','u',:) = AutoThrottle;                 % Autothrottle
-AFCS({'L2','R2'},'pcg',:) = [1;-1]*RollDamper;       % Roll Damper
-AFCS({'L2','R2'},'phi',:) = [1;-1]*RollController;   % Bank Angle Control
-AFCS({'L3','R3'},{'theta','h'},:) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
-
+AFCS({'aileron'},'pcg',:) = RollDamper;       % Roll Damper
+AFCS({'aileron'},'phi',:) = RollController;   % Bank Angle Control
+AFCS({'elevator'},{'theta','h'},:) = ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
 %% Robustness Margins
 % Robustness margins are calculated using the LOOPMARGIN command (called
@@ -150,44 +154,10 @@ for ii=1:numel(Vinf)
 [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
  OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
  MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
- DisplayLoopmargin(P(:,:,ii),AFCS(:,:,ii));
+ DisplayLoopmargin( minreal(P(:,:,ii)*InputAllocP) ,AFCS(:,:,ii)); % minreal here could be avoided; currently used to get rid off actuator states in the elevator/aileron inputs 
 end
 
 
-% Roll Control AP Loop Robustness Check %JT: This is a little ad hoc, but
-% should work
-contrf = 1:9; measf = 1:12; contr = [3 4]; meas = [4 6]; alloc = [1 -1];
-Paug = feedback(P,minreal(AFCS(contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))))),contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))));
-Paug = minreal(Paug(meas,contr)*alloc');
-Paug.InputName = {'L2-R2'};
-AP = alloc*minreal(AFCS(contr,meas));
-AP.OutputName = {'L2-R2'};
-for ii=1:numel(Vinf)
-    fprintf('\nRoll AP: Model at airspeed %2.1f m/s:\n', Vinf(ii))
-    [ICM_G_roll(:,ii), ICM_P_roll(:,ii), ICM_D_roll(:,ii), IDM_G_roll(:,ii), IDM_P_roll(:,ii), ...
-     OCM_G_roll(:,ii), OCM_P_roll(:,ii), OCM_D_roll(:,ii), ODM_G_roll(:,ii), ODM_P_roll(:,ii), ...
-     MMI_G_roll(:,ii), MMI_P_roll(:,ii), MMO_G_roll(:,ii), MMO_P_roll(:,ii), MMIO_G_roll(:,ii), MMIO_P_roll(:,ii)] = ...
-    DisplayLoopmargin(Paug(:,:,ii),AP(:,:,ii));
-end
-
-
-% Pitch Control AP Loop Robustness Check 
-contrf = 1:9; measf = 1:12; contr = [5 6]; meas = [2 3]; alloc = [1 1];
-Paug = feedback(P,minreal(AFCS(contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))))),contrf(not(ismember(contrf,contr))),measf(not(ismember(measf,meas))));
-Paug = minreal(Paug(meas,contr)*alloc');
-Paug.InputName = {'L3+R3'};
-AP = alloc*minreal(AFCS(contr,meas));
-AP.OutputName = {'L3+R3'};
-for ii=1:numel(Vinf)
-    fprintf('\nPitch AP: Model at airspeed %2.1f m/s:\n', Vinf(ii))
-    [ICM_G_pitch(:,ii), ICM_P_pitch(:,ii), ICM_D_pitch(:,ii), IDM_G_pitch(:,ii), IDM_P_pitch(:,ii), ...
-     OCM_G_pitch(:,ii), OCM_P_pitch(:,ii), OCM_D_pitch(:,ii), ODM_G_pitch(:,ii), ODM_P_pitch(:,ii), ...
-     MMI_G_pitch(:,ii), MMI_P_pitch(:,ii), MMO_G_pitch(:,ii), MMO_P_pitch(:,ii), MMIO_G_pitch(:,ii), MMIO_P_roll(:,ii)] = ...
-    DisplayLoopmargin(Paug(:,:,ii),AP(:,:,ii));
-end
-
-ICM_P = [ICM_P; ICM_P_roll; ICM_P_pitch];
-ICM_G = [ICM_G; ICM_G_roll; ICM_G_pitch];
 
 %calculate Robust and Absolute Flutter Speed
 [RFS, AFS, vis] = CalculateRobustFlutterSpeed(ICM_P,OCM_P,ICM_G,OCM_G,Vinf);
@@ -211,7 +181,7 @@ figure; plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin')
 xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
 fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
-legend([P.InputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([InputAllocP.InputName;['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
 % plot of minimum classical gain margin at input over airspeed
@@ -223,8 +193,22 @@ ylims = vis.RFS_G_y;
 ylims(ylims==0) = 1;
 fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none'); hold off;
 ylim([1 100]);
-legend([P.InputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([InputAllocP.InputName;['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
+
+% plot of minimum classical gain margin at input over airspeed
+InputGain = abs(db(MMI_G));
+figure; 
+plot([AFS AFS],[1 100],'k--','LineWidth',3); 
+ylims = vis.RFS_G_y;
+ylims(ylims==0) = 1;
+fill(vis.RFS_G_x, ylims,[1 0.7 0.7],'LineStyle','none'); hold off;
+ylim([1 100]);
+hold on,
+semilogy(Vinf,InputGain,'LineWidth',3); title('Multi-Input Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
+xlim([Vinf(1) Vinf(end)]); ylim([0 20]);
+grid on
+
 
 
 set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
@@ -247,7 +231,7 @@ xlim([Vinf(1) Vinf(end)]); ylim([0 90]);
 hold on; plot([AFS AFS],[0 90],'k--','LineWidth',3); 
 % area(vis.RFS_P_x, vis.RFS_P_y); hold off;
 fill(vis.RFS_P_x, vis.RFS_P_y,[1 0.7 0.7],'LineStyle','none'); hold off;
-legend([P.OutputName(:);'Roll AP';'Pitch AP';['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
+legend([P.OutputName(:);['AFS = ' num2str(AFS,'%2.1f') ' m/s'];['RFS = ' num2str(RFS,'%2.1f') ' m/s']],'Location','best')
 grid on
 
 % plot of minimum classical gain margin at output over airspeed
@@ -281,13 +265,13 @@ set(groot,'defaultAxesColorOrder','remove')
 % ** combinations of dynamic actuator, plant, and sensor uncertainty
 
 % check at robust flutter speed
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'g'); %plot gang of six Singular Values
+DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'g'); %plot gang of six Singular Values
 
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'ua'); %plot allowable dynamic additive uncertainty
-DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
-[~, Peaks] = DisplayLoopsens(P(:,:,Vinf==RFS),AFCS(:,:,Vinf==RFS),w,'so') %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
+DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
+DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'ua'); %plot allowable dynamic additive uncertainty
+DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
+[~, Peaks] = DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'so') %plot allowable dynamic multiplicative uncertainty in each input
 
 
 
@@ -302,7 +286,7 @@ xlim([-60,10])
 ylim([0,60])
 sgrid
 
-varypzmap(feedback(P,AFCS))
+varypzmap(feedback(P*InputAllocP,AFCS))
 caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
 ylim([0,60])
