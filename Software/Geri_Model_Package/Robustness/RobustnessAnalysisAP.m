@@ -21,8 +21,9 @@ close all
 
 %% Define Example System / Controller
 
+
 Vinfs = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'ILAF'; %'HINF' %'MIDAAS' %'ILAF' 
+ControllerSelection = 'MIDAAS'; %'HINF' %'MIDAAS' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -48,6 +49,7 @@ switch ControllerSelection
     otherwise
         disp('please select HINF, MIDAAS, or ILAF')
 end
+
 
 Vinf = Vinfs; %this needs to be done since MIDAAS loads in a Vinf
 
