@@ -62,11 +62,18 @@ for ii=1:nu
     
     [minCMI_P(ii), minCMI_P_idx] = min(abs(CMI(ii).PhaseMargin));
     [minCMI_D(ii), minCMI_D_idx] = min(CMI(ii).DelayMargin);
-    [~, minCMI_G_idx] = min(abs(CMI(ii).GainMargin));
-    minCMI_G(ii) = CMI(ii).GainMargin(minCMI_G_idx);
+%     [~, minCMI_G_idx] = min(abs(CMI(ii).GainMargin));
+%     minCMI_G(ii) = CMI(ii).GainMargin(minCMI_G_idx);
     DMI_P(ii) = DMI(ii).PhaseMargin(2);
     DMI_G(ii) = DMI(ii).GainMargin(2);
     
+    % XXX PJS: Compute both lower and upper gain margins. 
+    % Return the smaller margin (in a multiplicative sense)
+    TempGM = CMI(ii).GainMargin;
+    TempGM( TempGM<1 ) = 1./TempGM( TempGM<1 );
+    [~, minCMI_G_idx] = min(TempGM);
+    minCMI_G(ii) = TempGM(minCMI_G_idx);
+        
     fprintf(['Breaking Loop at Input ' int2str(ii) ' ("' P.InputName{ii} '")\n']) 
     if ~isfinite(minCMI_G(ii))
         fprintf('\t Minimum Gain Margin: \t Infinite\n')
@@ -95,11 +102,18 @@ for ii=1:ny
     
     [minCMO_P(ii), minCMO_P_idx] = min(abs(CMO(ii).PhaseMargin));
     [minCMO_D(ii), minCMO_D_idx] = min(CMO(ii).DelayMargin);
-    [~, minCMO_G_idx] = min(abs(CMO(ii).GainMargin));
-    minCMO_G(ii) = CMO(ii).GainMargin(minCMO_G_idx);
+%     [~, minCMO_G_idx] = min(abs(CMO(ii).GainMargin));
+%     minCMO_G(ii) = CMO(ii).GainMargin(minCMO_G_idx);
     DMO_P(ii) = DMO(ii).PhaseMargin(2);
     DMO_G(ii) = DMO(ii).GainMargin(2);
     
+
+    % XXX PJS: Compute both lower and upper gain margins. 
+    % Return the smaller margin (in a multiplicative sense)
+    TempGM = CMO(ii).GainMargin;
+    TempGM( TempGM<1 ) = 1./TempGM( TempGM<1 );
+    [~, minCMO_G_idx] = min(TempGM);
+    minCMO_G(ii) = TempGM(minCMO_G_idx);    
     
     fprintf(['Breaking Loop at Output ' int2str(ii) ' ("' P.OutputName{ii} '")\n'])
     if ~isfinite(minCMO_G(ii))
