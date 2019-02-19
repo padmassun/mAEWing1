@@ -23,7 +23,7 @@ close all
 
 
 Vinfs = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'MIDAAS'; %'HINF' %'MIDAAS' %'ILAF' 
+ControllerSelection = 'HINF'; %'HINF' %'MIDAAS' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -214,23 +214,39 @@ PMthresh = 45;
 
 InputPhase = ICM_P; InputPhase(InputPhase>=90)=90; 
 InputGain = abs(db(ICM_G));
-InputGain(ICM_G==0) = -1E2;
+InputGain(:,Vinf>=AFS) = 0;
 InputGainMMI = abs(db(MMI_G));
+InputGainMMI(Vinf>=AFS) = 0;
 
 OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90;
 OutputGain = abs(db(OCM_G));
-OutputGain(OCM_G==0) = -1E2;
+OutputGain(:,Vinf>=AFS) = 0;
 
-RFSIPM = findcrossing(Vinf,min(InputPhase),PMthresh); %RFS using this criteria;
-if min(InputPhase(:,Vinf<AFS)) > PMthresh;RFSIPM = AFS;end
-RFSIGM = findcrossing(Vinf,min(InputGain),GMthresh); %RFS using this criteria;
-if min(InputGain(:,Vinf<AFS)) > GMthresh;RFSIGM = AFS;end
-RFSMMI = findcrossing(Vinf,InputGainMMI,GMthresh); %RFS using this criteria; 
-if InputGainMMI(:,Vinf<AFS) > GMthresh;RFSMMI = AFS;end
-RFSOPM = findcrossing(Vinf,min(OutputPhase),PMthresh); %RFS using this criteria;
-if min(OutputPhase(:,Vinf<AFS)) > PMthresh;RFSOPM = AFS;end
-RFSOGM = findcrossing(Vinf,min(OutputGain),GMthresh); %RFS using this criteria;
-if min(OutputGain(:,Vinf<AFS)) > GMthresh;RFSOGM = AFS;end
+if min(InputPhase(:,Vinf<AFS)) > PMthresh
+    RFSIPM = AFS;
+else
+    RFSIPM = findcrossing(Vinf,min(InputPhase),PMthresh); %RFS using this criteria;
+end
+if min(InputGain(:,Vinf<AFS)) > GMthresh
+    RFSIGM = AFS;
+else
+    RFSIGM = findcrossing(Vinf,min(InputGain),GMthresh); %RFS using this criteria;
+end
+if InputGainMMI(:,Vinf<AFS) > GMthresh
+    RFSMMI = AFS;
+else
+    RFSMMI = findcrossing(Vinf,InputGainMMI,GMthresh); %RFS using this criteria; 
+end
+if min(OutputPhase(:,Vinf<AFS)) > PMthresh
+    RFSOPM = AFS;
+else
+    RFSOPM = findcrossing(Vinf,min(OutputPhase),PMthresh); %RFS using this criteria;
+end
+if min(OutputGain(:,Vinf<AFS)) > GMthresh
+    RFSOGM = AFS;
+else
+    RFSOGM = findcrossing(Vinf,min(OutputGain),GMthresh); %RFS using this criteria;
+end
 
 RFS = min([RFSIPM,RFSIGM,RFSOPM,RFSOGM]); %based on classical loop-at-a-time
 % RFS = min([RFSIPM,RFSIGM,RFSOPM,RFSOGM,RFSMMI]); %based on classical loop-at-a-time and MMI GM
@@ -245,64 +261,20 @@ fprintf(['\n   Individual RFS:\n   RFS due to PM at Input: %2.1f m/s' ...
 
 %% plot Robust Flutter Margin Results
 
-%set line types
-set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
-                                        0.4937    0.2780    0.9119
-                                        0.3999    0.4564    0.9832
-                                        0.3001    0.6139    0.8594
-                                        0.2301    0.7377    0.6762
-                                        0.2968    0.8270    0.4643
-                                        0.3778    0.8968    0.2928
-                                        0.6180    0.9255    0.3314
-                                        0.8000    0.9255    0.3529],...
-      'DefaultAxesLineStyleOrder','-|-.|:|--')
-
-% plot of minimum classical phase margin at input over airspeed
-figure; 
-plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');
-ylimits = get(gca,'Ylim');
-ylims = vis.RFS_P_y;
-ylims(ylims==0) = ylimits(1);
-hold on
-RFS_P_x_IPM = vis.RFS_P_x;
-RFS_P_x_IPM(2:3) = RFSIPM;
-fill(RFS_P_x_IPM, ylims,[1 0.7 0.7],'LineStyle','none');
-plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-grid on
-legend([InputAllocP.InputName;['RFS = ' num2str(RFSIPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
-
-% plot of minimum classical gain margin at input over airspeed
-figure; 
-semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');
-ylimits = get(gca,'Ylim');
-ylims = vis.RFS_G_y;
-ylims(ylims==0) = min(ylimits(1),1);
-RFS_G_x_IGM = vis.RFS_G_x;
-RFS_G_x_IGM(2:3) = RFSIGM;
-hold on
-fill(RFS_G_x_IGM, ylims,[1 0.7 0.7],'LineStyle','none');
-plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-grid on
-legend([InputAllocP.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
-
-% plot of Multi-Input Disk Gain Margin at input over airspeed
-figure; 
-semilogy(Vinf,InputGainMMI,'LineWidth',3); title('Multi-Input Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
-ylimits = get(gca,'Ylim');
-ylims = vis.RFS_G_y;
-ylims(ylims==0) = min(ylimits(1),1);
-RFS_G_x_MMI = vis.RFS_G_x;
-RFS_G_x_MMI(2:3) = RFSMMI;
-hold on
-fill(RFS_G_x_MMI, ylims,[1 0.7 0.7],'LineStyle','none');
-plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-grid on
-legend('Multi-Input Disk Gain Margin',['RFS = ' num2str(RFSMMI,'%2.1f') ' m/s'],['AFS = ' num2str(AFS,'%2.1f') ' m/s'],'Location','best')
+gyscale = 'linear'; %'log'; %specify y-scale for gain plots (linear or log) [it always plots gain in db, so log scale is really a double log of magnitude]
 
 %set line types
+% set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
+%                                         0.4937    0.2780    0.9119
+%                                         0.3999    0.4564    0.9832
+%                                         0.3001    0.6139    0.8594
+%                                         0.2301    0.7377    0.6762
+%                                         0.2968    0.8270    0.4643
+%                                         0.3778    0.8968    0.2928
+%                                         0.6180    0.9255    0.3314
+%                                         0.8000    0.9255    0.3529],...
+%       'DefaultAxesLineStyleOrder','-|-.|:|--')
+
 set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
                                         0.5139    0.2199    0.8542
                                         0.4451    0.3603    0.9842
@@ -314,38 +286,137 @@ set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
                                         0.3553    0.8867    0.2935
                                         0.4938    0.9181    0.3081
                                         0.6713    0.9255    0.3375
-                                        0.8000    0.9255    0.3529])
-                                    
+                                        0.8000    0.9255    0.3529],...
+      'DefaultAxesLineStyleOrder','-|-.|:|--')
+
+% plot of minimum classical phase margin at input over airspeed
+figure; 
+plot(Vinf,InputPhase,'LineWidth',3); title('Minimum Input Phase Margin'); xlabel('airspeed'); ylabel('degrees');
+ylims = vis.RFS_P_y;
+hold on
+RFS_P_x_IPM = vis.RFS_P_x;
+RFS_P_x_IPM(2:3) = RFSIPM;
+fill(RFS_P_x_IPM, ylims,[1 0.7 0.7],'LineStyle','none');
+ylimits = get(gca,'Ylim');
+plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+grid on
+legend([InputAllocP.InputName;['RFS = ' num2str(RFSIPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+
 % plot of minimum classical phase margin at output over airspeed
 figure; 
 plot(Vinf,OutputPhase,'LineWidth',3); title('Minimum Output Phase Margin'); xlabel('airspeed'); ylabel('degrees');
-ylimits = get(gca,'Ylim');
 ylims = vis.RFS_P_y;
-ylims(ylims==0) = ylimits(1);
 hold on
 RFS_P_x_OPM = vis.RFS_P_x;
 RFS_P_x_OPM(2:3) = RFSOPM;
 fill(RFS_P_x_OPM, ylims,[1 0.7 0.7],'LineStyle','none');
+ylimits = get(gca,'Ylim');
 plot([AFS AFS],ylimits,'k--','LineWidth',3); 
 xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
 grid on
 legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
 
-% plot of minimum classical gain margin at output over airspeed
-figure; 
-semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');
-ylimits = get(gca,'Ylim');
-ylims = vis.RFS_G_y;
-ylims(ylims==0) = min(ylimits(1),1);
-RFS_G_x_OGM = vis.RFS_G_x;
-RFS_G_x_OGM(2:3) = RFSOGM;
-hold on
-fill(RFS_G_x_OGM, ylims,[1 0.7 0.7],'LineStyle','none');
-plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-grid on
-legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+switch gyscale
+    case 'log'
+        
+        InputGain(ICM_G==0) = -1E2;
+        OutputGain(OCM_G==0) = -1E2;
+        
+        % plot of minimum classical gain margin at input over airspeed (log y scale)
+        figure; 
+        semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');
+        ylimits = get(gca,'Ylim');
+        ylims = vis.RFS_G_y;
+        ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_IGM = vis.RFS_G_x;
+        RFS_G_x_IGM(2:3) = RFSIGM;
+        hold on
+        fill(RFS_G_x_IGM, ylims,[1 0.7 0.7],'LineStyle','none');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend([InputAllocP.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+        
+        % plot of Multi-Input Disk Gain Margin at input over airspeed (log y scale)
+        figure; 
+        semilogy(Vinf,InputGainMMI,'LineWidth',3); title('Multi-Input Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
+        ylimits = get(gca,'Ylim');
+        ylims = vis.RFS_G_y;
+        ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_MMI = vis.RFS_G_x;
+        RFS_G_x_MMI(2:3) = RFSMMI;
+        hold on
+        fill(RFS_G_x_MMI, ylims,[1 0.7 0.7],'LineStyle','none');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend('Multi-Input Disk Gain Margin',['RFS = ' num2str(RFSMMI,'%2.1f') ' m/s'],['AFS = ' num2str(AFS,'%2.1f') ' m/s'],'Location','best')
+        
+        % plot of minimum classical gain margin at output over airspeed (log y scale)
+        figure; 
+        semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');
+        ylimits = get(gca,'Ylim');
+        ylims = vis.RFS_G_y;
+        ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_OGM = vis.RFS_G_x;
+        RFS_G_x_OGM(2:3) = RFSOGM;
+        hold on
+        fill(RFS_G_x_OGM, ylims,[1 0.7 0.7],'LineStyle','none');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+        
+    case 'linear'
+        % plot of minimum classical gain margin at input over airspeed (linear y-scale)
+        figure; 
+        plot(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');
+        % ylimits = get(gca,'Ylim');
+        ylims = vis.RFS_G_y;
+        % ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_IGM = vis.RFS_G_x;
+        RFS_G_x_IGM(2:3) = RFSIGM;
+        hold on
+        fill(RFS_G_x_IGM, ylims,[1 0.7 0.7],'LineStyle','none');
+        ylimits = get(gca,'Ylim');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend([InputAllocP.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+        
+        % plot of Multi-Input Disk Gain Margin at input over airspeed (linear y scale)
+        figure; 
+        plot(Vinf,InputGainMMI,'LineWidth',3); title('Multi-Input Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
+        % ylimits = get(gca,'Ylim');
+        ylims = vis.RFS_G_y;
+        % ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_MMI = vis.RFS_G_x;
+        RFS_G_x_MMI(2:3) = RFSMMI;
+        hold on
+        fill(RFS_G_x_MMI, ylims,[1 0.7 0.7],'LineStyle','none');
+        ylimits = get(gca,'Ylim');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend('Multi-Input Disk Gain Margin',['RFS = ' num2str(RFSMMI,'%2.1f') ' m/s'],['AFS = ' num2str(AFS,'%2.1f') ' m/s'],'Location','best')
+        
+        % plot of minimum classical gain margin at output over airspeed (linear y scale)
+        figure; 
+        plot(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');
+        ylims = vis.RFS_G_y;
+        RFS_G_x_OGM = vis.RFS_G_x;
+        RFS_G_x_OGM(2:3) = RFSOGM;
+        hold on
+        fill(RFS_G_x_OGM, ylims,[1 0.7 0.7],'LineStyle','none');
+        ylimits = get(gca,'Ylim');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
 
+end
+                                    
 set(groot,'defaultAxesColorOrder','remove')
 
 
