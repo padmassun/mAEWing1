@@ -17,13 +17,14 @@
 % (matching the GeriFDsysPID2_IO model)
 
 clear all
-close all
+close all 
+
 
 %% Define Example System / Controller
 
 
 Vinfs = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'HINF'; %'HINF' %'MIDAAS' %'ILAF' 
+ControllerSelection = 'ILAF'; %'HINF' %'MIDAAS' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -117,6 +118,9 @@ w = {0.01, 1000}; %relevant frequency range for plotting
 
 
 %% Consider IOs as suggested by BPD 2019-01-18:
+
+includeAP = 0; %flag to include the autopilot
+
 AFCS = ss(zeros(size(P,2)-2,size(P,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
 AFCS.InputName  = P.OutputName;
 AFCS.OutputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
@@ -166,6 +170,52 @@ AFCS(C.OutputName,C.InputName,:) = C;    % Flutter Suppression
 
 load BaseLineController
 load standard_sos
+
+if ~includeAP %zero-out autopilots
+    warning('Autopilot is ''off''!');
+    AutoThrottle = 0;
+    RollDamper = 0;
+    RollController = 0;
+    PitchController = 0;
+    AltitudeController = 0;
+    
+    oxP = strcmp(OutputAllocP.outputname,'u') + ...
+        strcmp(OutputAllocP.outputname,'phi') + ...
+        strcmp(OutputAllocP.outputname,'theta') + ...
+        strcmp(OutputAllocP.outputname,'h');
+    
+    ixP = strcmp(InputAllocP.inputname,'Thrust') + ...
+        strcmp(InputAllocP.inputname,'aileron') + ...
+        strcmp(InputAllocP.inputname,'elevator');
+    
+    oxC = strcmp(OutputAllocAFCS.outputname,'Thrust') + ...
+        strcmp(OutputAllocAFCS.outputname,'aileron') + ...
+        strcmp(OutputAllocAFCS.outputname,'elevator');
+    
+    ixC = strcmp(InputAllocAFCS.inputname,'u') + ...
+        strcmp(InputAllocAFCS.inputname,'phi') + ...
+        strcmp(InputAllocAFCS.inputname,'theta') + ...
+        strcmp(InputAllocAFCS.inputname,'h');
+    
+    if strcmp(ControllerSelection,'ILAF')
+        oxP = oxP + strcmp(OutputAllocP.outputname,'pcg');
+        ixC = ixC + strcmp(InputAllocAFCS.inputname,'pcg');
+    end
+    
+    OutputAllocP = OutputAllocP(~oxP,:);
+    InputAllocP = InputAllocP(:,~ixP);
+    
+    OutputAllocAFCS = OutputAllocAFCS(~oxC,:);
+    InputAllocAFCS = InputAllocAFCS(:,~ixC);
+    
+    for ii=1:numel(Vinf)
+        P(:,:,ii) = modred(P(:,:,ii),[13 15 18],'truncate'); %have to get rid of u, theta, beta states (unstable spiral, phugoid)
+    end
+        
+end
+
+%NOTE: the below is valid ONLY since the AFCS uses different control inputs than that used for the AP!!
+
 AFCS('Thrust','u',:) = AutoThrottle;                 % Autothrottle
 AFCS({'aileron'},'pcg',:) = RollDamper;       % Roll Damper
 AFCS({'aileron'},'phi',:) = RollController;   % Bank Angle Control
@@ -222,30 +272,31 @@ OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90;
 OutputGain = abs(db(OCM_G));
 OutputGain(:,Vinf>=AFS) = 0;
 
-if min(InputPhase(:,Vinf<AFS)) > PMthresh
+
+if min(InputPhase(:,Vinf<AFS),[],1) > PMthresh
     RFSIPM = AFS;
 else
-    RFSIPM = findcrossing(Vinf,min(InputPhase),PMthresh); %RFS using this criteria;
+    RFSIPM = findcrossing(Vinf,min(InputPhase,[],1),PMthresh); %RFS using this criteria;
 end
-if min(InputGain(:,Vinf<AFS)) > GMthresh
+if min(InputGain(:,Vinf<AFS),[],1) > GMthresh
     RFSIGM = AFS;
 else
-    RFSIGM = findcrossing(Vinf,min(InputGain),GMthresh); %RFS using this criteria;
+    RFSIGM = findcrossing(Vinf,min(InputGain,[],1),GMthresh); %RFS using this criteria;
 end
 if InputGainMMI(:,Vinf<AFS) > GMthresh
     RFSMMI = AFS;
 else
     RFSMMI = findcrossing(Vinf,InputGainMMI,GMthresh); %RFS using this criteria; 
 end
-if min(OutputPhase(:,Vinf<AFS)) > PMthresh
+if min(OutputPhase(:,Vinf<AFS),[],1) > PMthresh
     RFSOPM = AFS;
 else
-    RFSOPM = findcrossing(Vinf,min(OutputPhase),PMthresh); %RFS using this criteria;
+    RFSOPM = findcrossing(Vinf,min(OutputPhase,[],1),PMthresh); %RFS using this criteria;
 end
-if min(OutputGain(:,Vinf<AFS)) > GMthresh
+if min(OutputGain(:,Vinf<AFS),[],1) > GMthresh
     RFSOGM = AFS;
 else
-    RFSOGM = findcrossing(Vinf,min(OutputGain),GMthresh); %RFS using this criteria;
+    RFSOGM = findcrossing(Vinf,min(OutputGain,[],1),GMthresh); %RFS using this criteria;
 end
 
 RFS = min([RFSIPM,RFSIGM,RFSOPM,RFSOGM]); %based on classical loop-at-a-time
