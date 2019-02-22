@@ -209,7 +209,7 @@ if ~includeAP %zero-out autopilots
     InputAllocAFCS = InputAllocAFCS(:,~ixC);
     
     for ii=1:numel(Vinf)
-        P(:,:,ii) = modred(P(:,:,ii),[13 15 18],'truncate'); %have to get rid of u, theta, beta states (unstable spiral, phugoid)
+        P(:,:,ii) = modred(P(:,:,ii),[13 15 19],'truncate'); %have to get rid of u, theta, phi states (unstable spiral, phugoid)
     end
         
 end
