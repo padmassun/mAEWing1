@@ -5,16 +5,7 @@
 % #######################################################################
 %
 % ### ANALYSIS PART ###
-% last modified 2018-08-15 Julian Theis
-%
-% RUN PART1_DESIGN_ROBUSTFLUTTERSUPPRESSION FIRST
-% uses variables in workspace, requires 
-% GeriFDsysPID2_IO : model with physical inputs/outputs
-% C : controller with physical inputs/outputs
-% Vinf : vector of airspeed
-%
-% The controller needs to have the correct naming of inputs and outputs
-% (matching the GeriFDsysPID2_IO model)
+% last modified 2019-03-02 Julian Theis
 
 clear all
 close all 
@@ -37,20 +28,20 @@ switch ControllerSelection
 %     C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
     
     case 'ILAF' % ILAF Controller
-    load('..\Controllers\ILAF\GeriAFSC_4x8.mat');
-    C = -Cont34_4x8;
-    C.OutputName = {'L1', 'R1', 'L4', 'R4'};
-    C.InputName  = {'qcg','pcg','nzCBfwd','nzCBaft', 'nzLwingfwd', 'nzLwingaft', 'nzRwingfwd', 'nzRwingaft'};
+    load('..\Controllers\ILAF\GeriAFSC34Final.mat');
+    C = Cont34Final;
     TAS = Vinfs;
     SF = zeros(1,1,numel(TAS));
     SF(TAS<=34) = 1;
-    SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: NOTE THAT THIS GOES BEYOND THE ORIGINAL TABLE, could be easily adapted
-    C = SF*C; C.OutputName = {'L1', 'R1', 'L4', 'R4'};
-    
+    SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: Note that this goes beyond the original table
+    % SF(TAS>36)=2; % JT: limit gain.scheduling to original table
+    C = SF*C; 
+    % form SISO controller, this is how Dave want's it implemented
+     C = -0.5*C*[1, -1]; 
+     C.OutputName = {'BF_sym'}; C.InputName = {'nzCBaft','nzCBfwd'};
     otherwise
         disp('please select HINF, MIDAAS, or ILAF')
 end
-
 
 Vinf = Vinfs; %this needs to be done since MIDAAS loads in a Vinf
 
@@ -93,7 +84,6 @@ sensdata.G_sens_IMU = G_sens_IMU;
 sensdata.G_sens_Accel = G_sens_Accel;
 
 ikeep = [1,2,3,4,5,6,7,8,9]; % all flaps + throttle
-% okeep = [1 3 5 7 4 8 13:18]; %uses q and p (mean axis rates)
 okeep = [1 3 5 7 10 11 13:18]; %uses qcg and pcg (sensor rates, more correct)
 
 %bare airframe as a function of velocity 
@@ -119,14 +109,14 @@ w = {0.01, 1000}; %relevant frequency range for plotting
 
 %% Consider IOs as suggested by BPD 2019-01-18:
 
-includeAP = 0; %flag to include the autopilot
-
-AFCS = ss(zeros(size(P,2)-2,size(P,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
-AFCS.InputName  = P.OutputName;
-AFCS.OutputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
+includeAP = 1; %flag to include the autopilot
 
 switch ControllerSelection
     case {'MIDAAS','HINF'}
+        AFCS = ss(zeros(size(P,2)-2,size(P,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
+        AFCS.InputName  = P.OutputName;
+        AFCS.OutputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
+        
         InputAllocP = ss(blkdiag(1,1,[1 -1], [1 1], 1, 1, 1)');
         InputAllocP.InputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
         
@@ -141,30 +131,57 @@ switch ControllerSelection
         InputAllocAFCS.InputName = OutputAllocP.OutputName;
         InputAllocAFCS.OutputName = AFCS.InputName;
         
-    case 'ILAF'
+        P_Alloc = OutputAllocP*P*InputAllocP;
+        % remove redundant actuator states (sym2 and asym3) for aileron and elevator #JT 2019-02-28
+        T = eye(85); 
+        T(46:57,46:57) = [eye(6) eye(6); eye(6) -eye(6)]; %L2, R2
+        T(58:69,58:69) = [eye(6) -eye(6); eye(6) eye(6)]; %L3, R3
+        P_tmp = ss2ss(P_Alloc,T); 
+        P_tmp.StateName([1:45, 70:85]) = P_Alloc.StateName([1:45, 70:85]);
+        P_tmp.StateName(52:57) = {'actuator_aileron'}; P_tmp.StateName(64:69) = {'actuator_elevator'};
+        clear P_IO
+        for ii=1:numel(Vinf)
+            P_min(:,:,ii) = modred(P_tmp(:,:,ii),[46:51,58:63],'truncate');
+        end
+         % bodemag(P_Alloc,P_IO) % as can be verified, both are still the same #JT 2019-02-28
+         
+
+
+    case 'ILAF'    
         ikeep = [1:3,6];
         
         InputAllocP = ss(blkdiag([1 1],[1 -1], [1 1], 1, 1, 1)');
-        InputAllocP.InputName = {'sym BF','aileron','elevator','L4','R4','Thrust'};
+        InputAllocP.InputName = {'BF_sym','aileron','elevator','L4','R4','Thrust'};
         InputAllocP = InputAllocP(:,ikeep); %don't need L4/R4 inputs for ILAF
         InputAllocP.OutputName = P.InputName;
-        
-        OutputAllocP = ss(eye(size(P,1)-4,size(P,1)));
-        OutputAllocP.OutputName = P.OutputName(1:8); %don't need wing accels for ILAF
+                
+        OutputAllocP = ss( eye(8,12) );
+        OutputAllocP.OutputName(1:8) = P.OutputName(1:8);
         OutputAllocP = OutputAllocP([1:4,6:8],:); %ILAF doesn't use qcg
         
-        OutputAllocAFCS = ss(blkdiag([1 1],1,1,1,1,1));
-        OutputAllocAFCS.InputName = AFCS.OutputName;
-        OutputAllocAFCS = OutputAllocAFCS(ikeep,:);
-        OutputAllocAFCS.OutputName = InputAllocP.InputName;
+        P_Alloc = OutputAllocP*P*InputAllocP;
         
-        InputAllocAFCS = ss(eye(size(P,1),size(P,1)-4));
-        InputAllocAFCS.OutputName = AFCS.InputName;
-        InputAllocAFCS = InputAllocAFCS(:,[1:4,6:8]); %ILAF doesn't use qcg
-        InputAllocAFCS.InputName = OutputAllocP.OutputName;
+        AFCS = ss(zeros(size(P_Alloc,2),size(P_Alloc,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
+        AFCS.InputName  = P_Alloc.OutputName;
+        AFCS.OutputName = P_Alloc.InputName;
+        
+        % remove redundant actuator states (sym2 and asym3) for aileron and elevator #JT 2019-02-28
+        T = eye(85); 
+        T(34:45,34:45) = [eye(6) -eye(6); eye(6) eye(6)]; %L1, R2
+        T(46:57,46:57) = [eye(6) eye(6); eye(6) -eye(6)]; %L2, R2
+        T(58:69,58:69) = [eye(6) -eye(6); eye(6) eye(6)]; %L3, R3
+        P_tmp = ss2ss(P_Alloc,T); 
+        P_tmp.StateName([1:33, 70:85]) = P_Alloc.StateName([1:33, 70:85]);
+        P_tmp.StateName(40:45) = {'actuator_BF'}; P_tmp.StateName(52:57) = {'actuator_aileron'}; P_tmp.StateName(64:69) = {'actuator_elevator'};
+        clear P_min
+        for ii=1:numel(Vinf)
+            P_min(:,:,ii) = modred(P_tmp(:,:,ii),[5,9:12,34:39,46:51,58:63,70:81],'truncate'); %remove sensor(q,acc) asym1, sym2, asym3, 4
+        end
+         % bodemag(P_Alloc,P_min) % as can be verified, both are still the
+         % same #JT 2019-02-28 XXX NOTE THAT THERE IS STILL 1 NONMINIMAL
+         % STATE, not sure why
 end
-OutputAllocP.InputName = P.OutputName;
-InputAllocP.OutputName = P.InputName;
+
 
 AFCS(C.OutputName,C.InputName,:) = C;    % Flutter Suppression
 
@@ -208,14 +225,14 @@ if ~includeAP %zero-out autopilots
     OutputAllocAFCS = OutputAllocAFCS(~oxC,:);
     InputAllocAFCS = InputAllocAFCS(:,~ixC);
     
+    elim = find(strcmp(P_min.statename,{'u'})+strcmp(P_min.statename,{'theta'})+strcmp(P_min.statename,{'phi'})); %have to get rid of u, theta, phi states (unstable spiral, phugoid)
     for ii=1:numel(Vinf)
-        P(:,:,ii) = modred(P(:,:,ii),[13 15 19],'truncate'); %have to get rid of u, theta, phi states (unstable spiral, phugoid)
+        P_min(:,:,ii) = modred(P_min(:,:,ii),elim,'truncate'); 
     end
         
 end
 
 %NOTE: the below is valid ONLY since the AFCS uses different control inputs than that used for the AP!!
-
 AFCS('Thrust','u',:) = AutoThrottle;                 % Autothrottle
 AFCS({'aileron'},'pcg',:) = RollDamper;       % Roll Damper
 AFCS({'aileron'},'phi',:) = RollController;   % Bank Angle Control
@@ -248,12 +265,19 @@ AFCS({'elevator'},{'theta','h'},:) = ss(PitchController)*[1 AltitudeController];
 
 for ii=1:numel(Vinf)
     fprintf('\nModel at airspeed %2.1f m/s:\n', Vinf(ii))
-[ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
- OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
- MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
- DisplayLoopmargin( minreal(OutputAllocP*P(:,:,ii)*InputAllocP) , OutputAllocAFCS*AFCS(:,:,ii)*InputAllocAFCS); % minreal here could be avoided; currently used to get rid off actuator states in the elevator/aileron inputs 
+     if includeAP
+        [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
+         OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
+         MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
+         DisplayLoopmargin( P_min(:,:,ii) , AFCS(:,:,ii));
+     else
+         [ICM_G(:,ii), ICM_P(:,ii), ICM_D(:,ii), IDM_G(:,ii), IDM_P(:,ii), ...
+         OCM_G(:,ii), OCM_P(:,ii), OCM_D(:,ii), ODM_G(:,ii), ODM_P(:,ii), ...
+         MMI_G(:,ii), MMI_P(:,ii), MMO_G(:,ii), MMO_P(:,ii), MMIO_G(:,ii), MMIO_P(:,ii)] = ...
+         DisplayLoopmargin( minreal(P_min(:,:,ii)) , minreal(AFCS(:,:,ii)) ); % w/o AP in the loop, minreal might still be needed here
+         warning('Autopilot is ''off''!');
+     end
 end
-
 %calculate Robust and Absolute Flutter Speed
 
 %set thresholds
