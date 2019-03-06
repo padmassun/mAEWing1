@@ -5,7 +5,7 @@
 % #######################################################################
 %
 % ### ANALYSIS PART ###
-% last modified 2019-03-02 Julian Theis
+% last modified 2019-03-06 Julian Theis
 
 clear all
 close all 
@@ -37,7 +37,7 @@ switch ControllerSelection
     % SF(TAS>36)=2; % JT: limit gain.scheduling to original table
     C = SF*C; 
     % form SISO controller, this is how Dave want's it implemented
-     C = -0.5*C*[1, -1]; 
+     C = -C*[1, -1]; 
      C.OutputName = {'BF_sym'}; C.InputName = {'nzCBaft','nzCBfwd'};
     otherwise
         disp('please select HINF, MIDAAS, or ILAF')
