@@ -15,7 +15,7 @@ close all
 
 
 Vinfs = 20:0.5:45; %JT: need to define flight speed here for consistency with gain-scheduled controller dimensions
-ControllerSelection = 'ILAF'; %'HINF' %'MIDAAS' %'ILAF' 
+ControllerSelection = 'HINF'; %'HINF' %'MIDAAS' %'ILAF' 
 
 switch ControllerSelection
     case 'HINF' % HINF Controller
@@ -38,7 +38,7 @@ switch ControllerSelection
     C = SF*C; 
     % form SISO controller, this is how Dave want's it implemented
      C = -C*[1, -1]; 
-     C.OutputName = {'BF_sym'}; C.InputName = {'nzCBaft','nzCBfwd'};
+     C.OutputName = {'BFsym'}; C.InputName = {'nzCBaft','nzCBfwd'};
     otherwise
         disp('please select HINF, MIDAAS, or ILAF')
 end
@@ -151,7 +151,7 @@ switch ControllerSelection
         ikeep = [1:3,6];
         
         InputAllocP = ss(blkdiag([1 1],[1 -1], [1 1], 1, 1, 1)');
-        InputAllocP.InputName = {'BF_sym','aileron','elevator','L4','R4','Thrust'};
+        InputAllocP.InputName = {'BFsym','aileron','elevator','L4','R4','Thrust'};
         InputAllocP = InputAllocP(:,ikeep); %don't need L4/R4 inputs for ILAF
         InputAllocP.OutputName = P.InputName;
                 
