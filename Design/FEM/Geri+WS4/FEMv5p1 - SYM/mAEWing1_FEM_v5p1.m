@@ -35,7 +35,7 @@ dof_beta_z_index = 6:6:size(effective_nodecord,1)*6;
 %% ===================================
 %% ======= USER INPUT ======
 %% ===================================
-modeNo = 8; % choose which mode to be plotted
+modeNo = 7; % choose which mode to be plotted
 scalefactor = 40; % scale mode shape magnitude in plot
 %% ===================================
 %% ===================================
@@ -147,7 +147,7 @@ for num_accel_con = 1:size(BEAM_ACCEL_nodes,1)
     independent_pnt_cord = cord_beam_grid;
     
     % relationship for obtaining the accel motion based on the beam grid
-    % motion, {d_accel} = [C]*{d_beam}
+    % motion for each accel, {d_accel} = [C]*{d_beam}
     Cmatrix = [
         1 0 0 0  (dependent_pnt_cord(4)-independent_pnt_cord(4)) 0
         0 1 0   -(dependent_pnt_cord(4)-independent_pnt_cord(4)) 0 (dependent_pnt_cord(2)-independent_pnt_cord(2))
