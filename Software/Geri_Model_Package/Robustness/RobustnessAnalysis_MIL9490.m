@@ -4,8 +4,9 @@
 %   Julian Theis, Peter Seiler
 % #######################################################################
 %
-% ### ANALYSIS PART ###
-% last modified 2019-03-06 Julian Theis
+% ### ANALYSIS IN ACCORDANCE WITH MIL9490 ###
+% ### Loops Broken At Individual Control Surfaces ###
+% last modified 2019-03-07 Julian Theis
 
 clear all
 close all 
@@ -34,11 +35,11 @@ switch ControllerSelection
     SF = zeros(1,1,numel(TAS));
     SF(TAS<=34) = 1;
     SF(TAS>34)=(0.5*TAS(TAS>34)-16); %JT: Note that this goes beyond the original table
-    % SF(TAS>36)=2; % JT: limit gain.scheduling to original table
+    % SF(TAS>36)=2; % JT: limit gain scheduling to original table
     C = SF*C; 
     % form SISO controller, this is how Dave want's it implemented
-     C = -C*[1, -1]; 
-     C.OutputName = {'BFSym'}; C.InputName = {'nzCBaft','nzCBfwd'};
+     C = -[1; 1]*C*[1, -1]; 
+     C.OutputName = {'L1','R1'}; C.InputName = {'nzCBaft','nzCBfwd'};
     otherwise
         disp('please select HINF, MIDAAS, or ILAF')
 end
@@ -112,74 +113,29 @@ w = {0.01, 1000}; %relevant frequency range for plotting
 includeAP = 1; %flag to include the autopilot
 
 switch ControllerSelection
-    case {'MIDAAS','HINF'}
-        AFCS = ss(zeros(size(P,2)-2,size(P,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
+    case {'MIDAAS','HINF'}   
+        AFCS = ss(zeros(size(P,2),size(P,1),numel(Vinf)));
         AFCS.InputName  = P.OutputName;
-        AFCS.OutputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
+        AFCS.OutputName = P.InputName;
         
-        InputAllocP = ss(blkdiag(1,1,[1 -1], [1 1], 1, 1, 1)');
-        InputAllocP.InputName = {'L1','R1','aileron','elevator','L4','R4','Thrust'};
-        
-        OutputAllocP = ss(eye(size(P,1)));
-        OutputAllocP.OutputName = P.OutputName;
-        
-        OutputAllocAFCS = ss(eye(size(AFCS,1)));
-        OutputAllocAFCS.OutputName = InputAllocP.InputName;
-        OutputAllocAFCS.InputName = AFCS.OutputName;
-        
-        InputAllocAFCS = ss(eye(size(P,1)));
-        InputAllocAFCS.InputName = OutputAllocP.OutputName;
-        InputAllocAFCS.OutputName = AFCS.InputName;
-        
-        P_Alloc = OutputAllocP*P*InputAllocP;
-        % remove redundant actuator states (sym2 and asym3) for aileron and elevator #JT 2019-02-28
-        T = eye(85); 
-        T(46:57,46:57) = [eye(6) eye(6); eye(6) -eye(6)]; %L2, R2
-        T(58:69,58:69) = [eye(6) -eye(6); eye(6) eye(6)]; %L3, R3
-        P_tmp = ss2ss(P_Alloc,T); 
-        P_tmp.StateName([1:45, 70:85]) = P_Alloc.StateName([1:45, 70:85]);
-        P_tmp.StateName(52:57) = {'actuator_aileron'}; P_tmp.StateName(64:69) = {'actuator_elevator'};
-        clear P_IO
-        for ii=1:numel(Vinf)
-            P_min(:,:,ii) = modred(P_tmp(:,:,ii),[46:51,58:63],'truncate');
-        end
-         % bodemag(P_Alloc,P_IO) % as can be verified, both are still the same #JT 2019-02-28
-         
-
+        P_min = P;
 
     case 'ILAF'    
-        ikeep = [1:3,6];
+        ikeep = [1:6, 9]; %L1, R1, L2, R2, L3, R3, Thrust
+        okeep = [1:4, 6:8]; % u theta h phi p nzCBaft nzCBfwd
+
+        P_Alloc = P(okeep,ikeep);
         
-        InputAllocP = ss(blkdiag([1 1],[1 -1], [1 1], 1, 1, 1)');
-        InputAllocP.InputName = {'BFSym','aileron','elevator','L4','R4','Thrust'};
-        InputAllocP = InputAllocP(:,ikeep); %don't need L4/R4 inputs for ILAF
-        InputAllocP.OutputName = P.InputName;
-                
-        OutputAllocP = ss( eye(8,12) );
-        OutputAllocP.OutputName(1:8) = P.OutputName(1:8);
-        OutputAllocP = OutputAllocP([1:4,6:8],:); %ILAF doesn't use qcg
-        
-        P_Alloc = OutputAllocP*P*InputAllocP;
-        
-        AFCS = ss(zeros(size(P_Alloc,2),size(P_Alloc,1),numel(Vinf))); %-2 to consider aileron and elevator as single surfaces
+        AFCS = ss(zeros(size(P_Alloc,2),size(P_Alloc,1),numel(Vinf)));
         AFCS.InputName  = P_Alloc.OutputName;
         AFCS.OutputName = P_Alloc.InputName;
         
-        % remove redundant actuator states (sym2 and asym3) for aileron and elevator #JT 2019-02-28
-        T = eye(85); 
-        T(34:45,34:45) = [eye(6) -eye(6); eye(6) eye(6)]; %L1, R2
-        T(46:57,46:57) = [eye(6) eye(6); eye(6) -eye(6)]; %L2, R2
-        T(58:69,58:69) = [eye(6) -eye(6); eye(6) eye(6)]; %L3, R3
-        P_tmp = ss2ss(P_Alloc,T); 
-        P_tmp.StateName([1:33, 70:85]) = P_Alloc.StateName([1:33, 70:85]);
-        P_tmp.StateName(40:45) = {'actuator_BF'}; P_tmp.StateName(52:57) = {'actuator_aileron'}; P_tmp.StateName(64:69) = {'actuator_elevator'};
+        % remove unused sensor and actuator states (L4 R4)
         clear P_min
         for ii=1:numel(Vinf)
-            P_min(:,:,ii) = modred(P_tmp(:,:,ii),[5,9:12,34:39,46:51,58:63,70:81],'truncate'); %remove sensor(q,acc) asym1, sym2, asym3, 4
+            P_min(:,:,ii) = modred(P_Alloc(:,:,ii),[5,9:12,70:81],'truncate'); %remove sensor(q,acc) asym1, sym2, asym3, 4
         end
-         % bodemag(P_Alloc,P_min) % as can be verified, both are still the
-         % same #JT 2019-02-28 XXX NOTE THAT THERE IS STILL 1 NONMINIMAL
-         % STATE, not sure why
+         % bodemag(P_Alloc,P_min) %verified, both are still the same
 end
 
 
@@ -234,9 +190,9 @@ end
 
 %NOTE: the below is valid ONLY since the AFCS uses different control inputs than that used for the AP!!
 AFCS('Thrust','u',:) = AutoThrottle;                 % Autothrottle
-AFCS({'aileron'},'pcg',:) = RollDamper;       % Roll Damper
-AFCS({'aileron'},'phi',:) = RollController;   % Bank Angle Control
-AFCS({'elevator'},{'theta','h'},:) = ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
+AFCS({'L2','R2'},'pcg',:) = [1;-1]*RollDamper;       % Roll Damper
+AFCS({'L2','R2'},'phi',:) = [1;-1]*RollController;   % Bank Angle Control
+AFCS({'L3','R3'},{'theta','h'},:) = [1;1]*ss(PitchController)*[1 AltitudeController]; % Pitch Angle and Altitude Control
 
 
 %% Compute Robustness Margins
@@ -295,7 +251,8 @@ InputGainMMI(Vinf>=AFS) = 0;
 OutputPhase = OCM_P; OutputPhase(OutputPhase>=90)=90;
 OutputGain = abs(db(OCM_G));
 OutputGain(:,Vinf>=AFS) = 0;
-
+OutputGainMMO = abs(db(MMO_G));
+OutputGainMMO(Vinf>=AFS) = 0;
 
 if min(InputPhase(:,Vinf<AFS),[],1) > PMthresh
     RFSIPM = AFS;
@@ -322,6 +279,11 @@ if min(OutputGain(:,Vinf<AFS),[],1) > GMthresh
 else
     RFSOGM = findcrossing(Vinf,min(OutputGain,[],1),GMthresh); %RFS using this criteria;
 end
+if OutputGainMMO(:,Vinf<AFS) > GMthresh
+    RFSMMO = AFS;
+else
+    RFSMMO = findcrossing(Vinf,OutputGainMMO,GMthresh); %RFS using this criteria; 
+end
 
 RFS = min([RFSIPM,RFSIGM,RFSOPM,RFSOGM]); %based on classical loop-at-a-time
 % RFS = min([RFSIPM,RFSIGM,RFSOPM,RFSOGM,RFSMMI]); %based on classical loop-at-a-time and MMI GM
@@ -331,24 +293,13 @@ fprintf(['\n   Individual RFS:\n   RFS due to PM at Input: %2.1f m/s' ...
     '\n   RFS due to GM at Input: %2.1f m/s' ...
     '\n   RFS due to PM at Output: %2.1f m/s' ...
     '\n   RFS due to GM at Output: %2.1f m/s' ...
-    '\n   RFS due to GM at Multi-Input: %2.1f m/s\n'],RFSIPM,RFSIGM,RFSOPM,RFSOGM,RFSMMI);
+    '\n   RFS due to GM at Multi-Input: %2.1f m/s' ...
+    '\n   RFS due to GM at Multi-Output: %2.1f m/s\n'],RFSIPM,RFSIGM,RFSOPM,RFSOGM,RFSMMI,RFSMMO);
 
 
 %% plot Robust Flutter Margin Results
 
 gyscale = 'linear'; %'log'; %specify y-scale for gain plots (linear or log) [it always plots gain in db, so log scale is really a double log of magnitude]
-
-%set line types
-% set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
-%                                         0.4937    0.2780    0.9119
-%                                         0.3999    0.4564    0.9832
-%                                         0.3001    0.6139    0.8594
-%                                         0.2301    0.7377    0.6762
-%                                         0.2968    0.8270    0.4643
-%                                         0.3778    0.8968    0.2928
-%                                         0.6180    0.9255    0.3314
-%                                         0.8000    0.9255    0.3529],...
-%       'DefaultAxesLineStyleOrder','-|-.|:|--')
 
 set(groot,'DefaultAxesColorOrder',[     0.5151    0.0482    0.6697
                                         0.5139    0.2199    0.8542
@@ -374,9 +325,9 @@ RFS_P_x_IPM(2:3) = RFSIPM;
 fill(RFS_P_x_IPM, ylims,[1 0.7 0.7],'LineStyle','none');
 ylimits = get(gca,'Ylim');
 plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+xlim([Vinf(1) Vinf(end)]);
 grid on
-legend([InputAllocP.InputName;['RFS = ' num2str(RFSIPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+legend([P_min.InputName;['RFS = ' num2str(RFSIPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
 
 % plot of minimum classical phase margin at output over airspeed
 figure; 
@@ -390,59 +341,12 @@ ylimits = get(gca,'Ylim');
 plot([AFS AFS],ylimits,'k--','LineWidth',3); 
 xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
 grid on
-legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+legend([P_min.outputname;['RFS = ' num2str(RFSOPM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
 
 switch gyscale
     case 'log'
-        
-        InputGain(ICM_G==0) = -1E2;
-        OutputGain(OCM_G==0) = -1E2;
-        
-        % plot of minimum classical gain margin at input over airspeed (log y scale)
-        figure; 
-        semilogy(Vinf,InputGain,'LineWidth',3); title('Minimum Input Gain Margin'); xlabel('airspeed'); ylabel('dB');
-        ylimits = get(gca,'Ylim');
-        ylims = vis.RFS_G_y;
-        ylims(ylims==0) = min(ylimits(1),1);
-        RFS_G_x_IGM = vis.RFS_G_x;
-        RFS_G_x_IGM(2:3) = RFSIGM;
-        hold on
-        fill(RFS_G_x_IGM, ylims,[1 0.7 0.7],'LineStyle','none');
-        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-        grid on
-        legend([InputAllocP.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
-        
-        % plot of Multi-Input Disk Gain Margin at input over airspeed (log y scale)
-        figure; 
-        semilogy(Vinf,InputGainMMI,'LineWidth',3); title('Multi-Input Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
-        ylimits = get(gca,'Ylim');
-        ylims = vis.RFS_G_y;
-        ylims(ylims==0) = min(ylimits(1),1);
-        RFS_G_x_MMI = vis.RFS_G_x;
-        RFS_G_x_MMI(2:3) = RFSMMI;
-        hold on
-        fill(RFS_G_x_MMI, ylims,[1 0.7 0.7],'LineStyle','none');
-        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-        grid on
-        legend('Multi-Input Disk Gain Margin',['RFS = ' num2str(RFSMMI,'%2.1f') ' m/s'],['AFS = ' num2str(AFS,'%2.1f') ' m/s'],'Location','best')
-        
-        % plot of minimum classical gain margin at output over airspeed (log y scale)
-        figure; 
-        semilogy(Vinf,OutputGain,'LineWidth',3); title('Minimum Output Gain Margin'); xlabel('airspeed'); ylabel('dB');
-        ylimits = get(gca,'Ylim');
-        ylims = vis.RFS_G_y;
-        ylims(ylims==0) = min(ylimits(1),1);
-        RFS_G_x_OGM = vis.RFS_G_x;
-        RFS_G_x_OGM(2:3) = RFSOGM;
-        hold on
-        fill(RFS_G_x_OGM, ylims,[1 0.7 0.7],'LineStyle','none');
-        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
-        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
-        grid on
-        legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
-        
+       % obsolete, as discussed
+       
     case 'linear'
         % plot of minimum classical gain margin at input over airspeed (linear y-scale)
         figure; 
@@ -458,7 +362,7 @@ switch gyscale
         plot([AFS AFS],ylimits,'k--','LineWidth',3); 
         xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
         grid on
-        legend([InputAllocP.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+        legend([P_min.InputName;['RFS = ' num2str(RFSIGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
         
         % plot of Multi-Input Disk Gain Margin at input over airspeed (linear y scale)
         figure; 
@@ -488,38 +392,26 @@ switch gyscale
         plot([AFS AFS],ylimits,'k--','LineWidth',3); 
         xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
         grid on
-        legend([OutputAllocP.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
+        legend([P_min.outputname;['RFS = ' num2str(RFSOGM,'%2.1f') ' m/s'];['AFS = ' num2str(AFS,'%2.1f') ' m/s']],'Location','best')
 
+
+        figure; 
+        plot(Vinf,OutputGainMMO,'LineWidth',3); title('Multi-Output Disk Margin (Gain)'); xlabel('airspeed'); ylabel('dB');
+        ylims = vis.RFS_G_y;
+        % ylims(ylims==0) = min(ylimits(1),1);
+        RFS_G_x_MMO = vis.RFS_G_x;
+        RFS_G_x_MMO(2:3) = RFSMMO;
+        hold on
+        fill(RFS_G_x_MMO, ylims,[1 0.7 0.7],'LineStyle','none');
+        ylimits = get(gca,'Ylim');
+        plot([AFS AFS],ylimits,'k--','LineWidth',3); 
+        xlim([Vinf(1) Vinf(end)]); %ylim([0 20]);
+        grid on
+        legend('Multi-Output Disk Gain Margin',['RFS = ' num2str(RFSMMO,'%2.1f') ' m/s'],['AFS = ' num2str(AFS,'%2.1f') ' m/s'],'Location','best')
+        
 end
                                     
 set(groot,'defaultAxesColorOrder','remove')
-
-
-%% Closed-Loop Transfer Function Analysis
-% All relevant closed-loop (or broken loop) transfer functions are 
-% calculated by LOOPSENS:
-% So  : output sensitivity (I+P*C)^-1     with plant P and compensator C
-% Si  : input sensitivity (I+C*P)^-1
-% To  : complementary output sensitivity P*C(I+P*C)^-1
-% Ti  : complementary input sensitivity C*P(I+C*P)^-1
-% CSo : controller sensitivity 
-% PSi : sensitivity to input disturbances
-
-% Covers the following points from our discussion:
-% * multi loop margins for all simultaneously closed feedback loops by the respective controller
-%   ** (non-symmetric) disk margins, i.e. peaks of S and T
-% * structured uncertainty descriptions
-% ** combinations of dynamic actuator, plant, and sensor uncertainty
-
-% check at robust flutter speed
-DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'g'); %plot gang of six Singular Values
-
-DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'ui'); %plot allowable dynamic multiplicative uncertainty in each input
-DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'uo'); %plot allowable dynamic multiplicative uncertainty in each output
-DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'ua'); %plot allowable dynamic additive uncertainty
-DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'si'); %plot allowable dynamic multiplicative uncertainty in each output
-[~, Peaks] = DisplayLoopsens(minreal(P(:,:,Vinf==RFS)*InputAllocP),AFCS(:,:,Vinf==RFS),w,'so') %plot allowable dynamic multiplicative uncertainty in each input
-
 
 
 %% QUALITATIVE (Root Loci)
@@ -533,7 +425,7 @@ xlim([-60,10])
 ylim([0,60])
 sgrid
 
-varypzmap(feedback(P*InputAllocP,AFCS))
+varypzmap(feedback(P_min,AFCS))
 caxis([Vinf(1) Vinf(end)])
 xlim([-60,10])
 ylim([0,60])
@@ -562,7 +454,7 @@ Satlw = -30;
 
 %build Controller for sim that may have I/O in different order incl gain
 %scheduling
-Csim = ss(zeros(size(C)));
+Csim = ss(zeros(4,8));
 Csim.outputname = P.inputname([1 2 7 8]);
 Csim.inputname = P.outputname([5:12]);
 Csim(C.OutputName,C.InputName,:) = C(:,:,:);
