@@ -1,11 +1,12 @@
 % mAEWing1 FEM v5.1
 
-% v2. the rigid connection between the accel and beam grid may have
+% xx_2. the rigid connection between the accel and beam grid may have
 % different spanwise location. Previous Cmatrix assumes they have same
 % spanwise location. The present version considers different spanwise
 % locations in both beam grid and accel locations, using cross-product to
 % obtain the Cmatrix.
 
+% xx_3: update a typo in Cmatrix
 
 % clear all;
 close all;
