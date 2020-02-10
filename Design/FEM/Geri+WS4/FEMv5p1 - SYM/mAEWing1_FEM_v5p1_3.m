@@ -6,7 +6,7 @@
 % locations in both beam grid and accel locations, using cross-product to
 % obtain the Cmatrix.
 
-% xx_3: update a typo in Cmatrix
+% xx_3: fixed a typo in Cmatrix
 
 % clear all;
 close all;
@@ -44,8 +44,8 @@ dof_beta_z_index = 6:6:size(effective_nodecord,1)*6;
 %% ===================================
 %% ======= USER INPUT ======
 %% ===================================
-modeNo = 7; % choose which mode to be plotted
-scalefactor = 40; % scale mode shape magnitude in plot
+modeNo = 9; % choose which mode to be plotted
+scalefactor = 20; % scale mode shape magnitude in plot
 
 %% ===================================
 %% ===================================
