@@ -44,7 +44,7 @@ dof_beta_z_index = 6:6:size(effective_nodecord,1)*6;
 %% ===================================
 %% ======= USER INPUT ======
 %% ===================================
-modeNo = 9; % choose which mode to be plotted
+modeNo = 7; % choose which mode to be plotted
 scalefactor = 20; % scale mode shape magnitude in plot
 
 %% ===================================
@@ -233,10 +233,10 @@ stinger_positions =[
 
 
 
-% [beam grid id  stinger grid id]
+% [nearest beam grid id  stinger grid id]
 BEAM_STINGER_nodes = ...
-    [  101001 21
-    3006 22
+    [  101001   21
+        3006    22
     %
     ];
 
